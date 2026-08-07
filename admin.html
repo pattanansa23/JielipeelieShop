@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบหลังบ้าน - ผู้ขาย</title>
+  
+  <!-- CSS สไตล์ลูกค้า + สไตล์แอดมิน -->
+  <link rel="stylesheet" href="css/admin-style.css">
+  
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="admin-header">
+    <a href="#" class="brand-logo">
+      🛒 ShopAdmin <span>SELLER</span>
+    </a>
+    <div id="header-actions" style="display: none;">
+      <a href="index.html" class="btn btn-secondary btn-sm" target="_blank">🛍️ ไปหน้าร้านค้า</a>
+      <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="margin-left: 8px;">ออกจากระบบ</button>
+    </div>
+  </header>
+
+  <!-- 1. ส่วนเข้าสู่ระบบ (แสดงเมื่อยังไม่ได้ล็อกอิน) -->
+  <div id="login-section" class="login-wrapper">
+    <div class="login-card">
+      <h2>ยินดีต้อนรับกลับ 👋</h2>
+      <p>กรุณาเข้าสู่ระบบผู้ขายเพื่อจัดการร้านค้า</p>
+      
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>อีเมลผู้ขาย</label>
+          <input type="email" id="email" class="text-input" placeholder="admin@shop.com" required>
+        </div>
+        <div class="form-group">
+          <label>รหัสผ่าน</label>
+          <input type="password" id="password" class="text-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. แผงควบคุมหลังบ้าน Main Dashboard (แสดงเมื่อล็อกอินแล้ว) -->
+  <main id="admin-panel" class="admin-container" style="display: none;">
+
+    <!-- Card 1: เพิ่มตัวเลือกสินค้า -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">🏷️ 1. เพิ่มตัวเลือกสินค้า (products_item)</div>
+        <div class="admin-card-subtitle">สร้างรหัสตัวเลือกและกำหนดราคาของตัวเลือกนั้นๆ เพื่อนำไปเลือกใช้ในสินค้าหลัก</div>
+      </div>
+      
+      <form onsubmit="handleAddProductItem(event)">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>รหัสตัวเลือก (t_code)</label>
+            <input type="text" id="t-code" class="text-input" placeholder="เช่น T001, RED, SIZE-L" required>
+          </div>
+          <div class="form-group">
+            <label>ราคาตัวเลือก (t_price)</label>
+            <input type="number" id="t-price" class="text-input" placeholder="เช่น 150" step="0.01" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">➕ บันทึกตัวเลือก</button>
+      </form>
+
+      <div style="margin-top: 18px; padding-top: 15px; border-top: 1px solid #f3f4f6;">
+        <div style="font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 8px;">ตัวเลือกที่มีในระบบปัจจุบัน:</div>
+        <div id="items-tag-list"><span style="color:#9ca3af; font-size:13px;">กำลังโหลด...</span></div>
+      </div>
+    </div>
+
+    <!-- Card 2: เพิ่มสินค้าใหม่ -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">📦 2. เพิ่มสินค้าใหม่ (products)</div>
+        <div class="admin-card-subtitle">ใส่ข้อมูลสินค้า รูปภาพ และเลือกตัวเลือกสินค้าที่เกี่ยวข้อง</div>
+      </div>
+
+      <form onsubmit="handleAddProduct(event)">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>ชื่อสินค้า (p_name)</label>
+            <input type="text" id="p-name" class="text-input" placeholder="เช่น เสื้อยืดลายแฟชั่น" required>
+          </div>
+          <div class="form-group">
+            <label>จำนวนสต็อกเริ่มต้น (stock)</label>
+            <input type="number" id="p-stock" class="text-input" placeholder="เช่น 50" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>URL รูปภาพสินค้า (รองรับ Google Drive Direct Link / ใส่แยกบรรทัดเพื่อเพิ่มหลายรูป)</label>
+          <textarea id="p-image" class="text-input" rows="3" placeholder="https://drive.google.com/file/d/xxxx/view&#10;https://example.com/image2.jpg"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>เลือกตัวเลือกที่ใช้กับสินค้านี้ (p_code_a)</label>
+          <div id="item-checkboxes" class="checkbox-grid">
+            <span style="color:#9ca3af; font-size:13px;">กำลังโหลดตัวเลือก...</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="margin-top: 10px;">✨ บันทึกเพิ่มสินค้า</button>
+      </form>
+    </div>
+
+    <!-- Card 3: ตารางจัดการสินค้า & สต็อก -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">🗂️ 3. สินค้าทั้งหมด & จัดการสต็อก</div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รูปภาพ</th>
+              <th>ชื่อสินค้า</th>
+              <th>ตัวเลือกสินค้า</th>
+              <th style="width: 130px;">คลังสต็อก</th>
+              <th style="width: 160px;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="admin-products-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Card 4: ตารางรายการสั่งซื้อ -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">📋 4. รายการสั่งซื้อจากลูกค้า (orders)</div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>วันที่/เวลา</th>
+              <th>ชื่อลูกค้า</th>
+              <th>LINE ID</th>
+              <th>เบอร์โทร</th>
+              <th>ยอดรวม</th>
+              <th>สถานะออเดอร์</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="admin-orders-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Script ตั้งค่า Supabase -->
+  <script src="js/config.js"></script>
+
+  <!-- Script การทำงานฝั่งแอดมิน -->
+  <script>
+    let globalItemsList = [];
+
+    function formatDriveUrl(url) {
+      if (!url) return '';
+      if (url.includes('drive.google.com')) {
+        const matchFileD = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (matchFileD && matchFileD[1]) return `https://lh3.googleusercontent.com/d/${matchFileD[1]}`;
+        const matchIdParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (matchIdParam && matchIdParam[1]) return `https://lh3.googleusercontent.com/d/${matchIdParam[1]}`;
+      }
+      return url;
+    }
+
+    function checkUser() {
+      const isLoggedIn = localStorage.getItem('isAdminLoggedIn');
+      if (isLoggedIn === 'true') {
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        document.getElementById('header-actions').style.display = 'flex';
+        loadAdminData();
+      } else {
+        document.getElementById('login-section').style.display = 'flex';
+        document.getElementById('admin-panel').style.display = 'none';
+        document.getElementById('header-actions').style.display = 'none';
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('email').value;
+      const passwordInput = document.getElementById('password').value;
+
+      try {
+        const { data: admin, error } = await supabase
+          .from('admins')
+          .select('*')
+          .eq('email', emailInput)
+          .eq('password', passwordInput)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (admin) {
+          localStorage.setItem('isAdminLoggedIn', 'true');
+          checkUser();
+        } else {
+          alert('อีเมลหรือรหัสผ่านไม่ถูกต้อง!');
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: ' + err.message);
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('isAdminLoggedIn');
+      checkUser();
+    }
+
+    async function handleAddProductItem(e) {
+      e.preventDefault();
+      const tCode = document.getElementById('t-code').value.trim();
+      const tPrice = parseFloat(document.getElementById('t-price').value);
+
+      const { error } = await supabase.from('products_item').insert([{ t_code: tCode, t_price: tPrice }]);
+
+      if (error) {
+        alert('เพิ่มตัวเลือกไม่สำเร็จ (รหัส t_code อาจซ้ำกัน): ' + error.message);
+      } else {
+        alert('เพิ่มตัวเลือกเรียบร้อย');
+        document.getElementById('t-code').value = '';
+        document.getElementById('t-price').value = '';
+        loadProductItems();
+      }
+    }
+
+    async function loadProductItems() {
+      const { data: items } = await supabase.from('products_item').select('*');
+      globalItemsList = items || [];
+
+      const tagList = document.getElementById('items-tag-list');
+      if (globalItemsList.length === 0) {
+        tagList.innerHTML = '<span style="color:#9ca3af; font-size:13px;">ยังไม่มีตัวเลือกในระบบ</span>';
+      } else {
+        tagList.innerHTML = globalItemsList.map(item => `
+          <span class="tag-badge">${item.t_code} (฿${item.t_price ?? 0})</span>
+        `).join('');
+      }
+
+      const checkboxContainer = document.getElementById('item-checkboxes');
+      if (globalItemsList.length === 0) {
+        checkboxContainer.innerHTML = '<span style="color:#9ca3af; font-size:13px;">โปรดเพิ่มตัวเลือกในข้อ 1 ก่อน</span>';
+      } else {
+        checkboxContainer.innerHTML = globalItemsList.map(item => `
+          <label class="checkbox-item">
+            <input type="checkbox" name="p_code_a_select" value="${item.t_code}">
+            <span>${item.t_code} (฿${item.t_price ?? 0})</span>
+          </label>
+        `).join('');
+      }
+    }
+
+    async function handleAddProduct(e) {
+      e.preventDefault();
+      const rawImageInput = document.getElementById('p-image').value;
+      const imageUrls = rawImageInput.split(/[\n,]+/).map(url => formatDriveUrl(url.trim())).filter(url => url.length > 0);
+      const selectedCodes = Array.from(document.querySelectorAll('input[name="p_code_a_select"]:checked')).map(cb => cb.value);
+
+      const { error } = await supabase.from('products').insert([{
+        p_name: document.getElementById('p-name').value,
+        stock: parseInt(document.getElementById('p-stock').value),
+        image_url: imageUrls,
+        p_code_a: selectedCodes
+      }]);
+
+      if (error) {
+        alert('เพิ่มสินค้าไม่สำเร็จ: ' + error.message);
+      } else { 
+        alert('เพิ่มสินค้าเรียบร้อย'); 
+        e.target.reset();
+        loadAdminData(); 
+      }
+    }
+
+    async function loadAdminData() {
+      await loadProductItems();
+      const { data: products } = await supabase.from('products').select('*');
+      
+      document.getElementById('admin-products-list').innerHTML = (products || []).map(p => {
+        const codesText = (p.p_code_a && p.p_code_a.length > 0) 
+          ? p.p_code_a.map(c => `<span class="tag-badge">${c}</span>`).join('') 
+          : '<span style="color:#9ca3af;">-</span>';
+        
+        let imagesHtml = '<span style="color:#9ca3af; font-size:12px;">ไม่มีรูป</span>';
+        if (p.image_url && Array.isArray(p.image_url) && p.image_url.length > 0) {
+          imagesHtml = `<img src="${formatDriveUrl(p.image_url[0])}" width="48" height="48" style="object-fit:cover; border-radius:8px;">`;
+        }
+
+        return `
+          <tr>
+            <td>${imagesHtml}</td>
+            <td><strong>${p.p_name}</strong></td>
+            <td>${codesText}</td>
+            <td>
+              <input type="number" value="${p.stock}" id="stock-${p.p_id}" class="text-input" style="padding: 4px 8px; font-weight:600;">
+            </td>
+            <td>
+              <div style="display:flex; gap:6px;">
+                <button onclick="updateStock('${p.p_id}')" class="btn btn-primary btn-sm">บันทึก</button>
+                <button onclick="deleteProduct('${p.p_id}')" class="btn btn-danger btn-sm">ลบ</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const { data: orders } = await supabase.from('orders').select('*').order('o_date', { ascending: false });
+      
+      document.getElementById('admin-orders-list').innerHTML = (orders || []).map(o => `
+        <tr>
+          <td><small style="color:#6b7280;">${new Date(o.o_date).toLocaleString('th-TH')}</small></td>
+          <td><strong>${o.o_name}</strong></td>
+          <td><span style="color:#10b981; font-weight:600;">${o.o_line || '-'}</span></td>
+          <td>${o.o_phone}</td>
+          <td><strong style="color:#4f46e5;">฿${o.o_total}</strong></td>
+          <td>
+            <select onchange="updateOrderStatus('${o.o_id}', this.value)" class="select-input" style="padding: 4px 8px; font-size: 13px;">
+              <option value="pending" ${o.o_status === 'pending' ? 'selected' : ''}>⏳ รอชำระ/รอยืนยัน</option>
+              <option value="paid" ${o.o_status === 'paid' ? 'selected' : ''}>✅ ชำระเงินแล้ว</option>
+              <option value="shipped" ${o.o_status === 'shipped' ? 'selected' : ''}>🚚 จัดส่งแล้ว</option>
+              <option value="completed" ${o.o_status === 'completed' ? 'selected' : ''}>🎉 เสร็จสิ้น (ลบออเดอร์)</option>
+              <option value="cancelled" ${o.o_status === 'cancelled' ? 'selected' : ''}>❌ ยกเลิก (ลบออเดอร์)</option>
+            </select>
+          </td>
+          <td>
+            <button onclick="viewOrderItems('${o.o_id}')" class="btn btn-secondary btn-sm">🔍 รายละเอียด</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteProduct(pId) {
+      if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?')) return;
+      const { error } = await supabase.from('products').delete().eq('p_id', pId);
+      if (error) alert('ลบสินค้าไม่สำเร็จ: ' + error.message);
+      else { alert('ลบสินค้าเรียบร้อย'); loadAdminData(); }
+    }
+
+    async function updateStock(pId) {
+      const newStock = document.getElementById(`stock-${pId}`).value;
+      const { error } = await supabase.from('products').update({ stock: parseInt(newStock) }).eq('p_id', pId);
+      if (error) alert('อัปเดตสต็อกไม่สำเร็จ: ' + error.message);
+      else alert('อัปเดตสต็อกเรียบร้อย');
+    }
+
+    async function updateOrderStatus(oId, status) {
+      if (status === 'completed' || status === 'cancelled') {
+        const actionName = status === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก';
+        if (!confirm(`เมื่อเลือกสถานะ "${actionName}" ระบบจะทำการลบออเดอร์นี้ออกจากฐานข้อมูล ยืนยันหรือไม่?`)) {
+          loadAdminData();
+          return;
+        }
+
+        try {
+          await supabase.from('order_items').delete().eq('order_id', oId);
+          const { error } = await supabase.from('orders').delete().eq('o_id', oId);
+          if (error) throw error;
+
+          alert(`ทำรายการ "${actionName}" และลบออเดอร์เรียบร้อยแล้ว`);
+          loadAdminData();
+        } catch (err) {
+          alert('เกิดข้อผิดพลาดในการลบออเดอร์: ' + err.message);
+        }
+      } else {
+        const { error } = await supabase.from('orders').update({ o_status: status }).eq('o_id', oId);
+        if (error) alert('อัปเดตสถานะไม่สำเร็จ: ' + error.message);
+        else alert('อัปเดตสถานะเรียบร้อย');
+      }
+    }
+
+    async function viewOrderItems(oId) {
+      const { data: items, error } = await supabase.from('order_items').select('*').eq('order_id', oId);
+      if (error || !items) {
+        alert('ไม่สามารถดึงข้อมูลรายการสินค้าได้');
+        return;
+      }
+      let summary = items.map(item => `• รหัสตัวเลือก: ${item.p_code_a} | จำนวน: ${item.quantity} | ราคา/ชิ้น: ฿${item.price}`).join('\n');
+      alert(`📦 รายการสินค้าในออเดอร์:\n\n${summary || 'ไม่มีรายการสินค้า'}`);
+    }
+
+    checkUser();
+  </script>
+</body>
+</html>

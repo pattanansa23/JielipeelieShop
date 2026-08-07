@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jielipeelie - พรีออเดอร์สินค้าคุณภาพ</title>
+  
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- นำเข้าไฟล์ CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- สไตล์สำหรับระบบเลื่อนสไลด์รูปภาพใน Modal -->
+  <style>
+    .modal-img-slider-container {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .modal-img-slider {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      gap: 10px;
+      border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 6px;
+    }
+
+    /* Custom Scrollbar สำหรับ Slider */
+    .modal-img-slider::-webkit-scrollbar {
+      height: 6px;
+    }
+    .modal-img-slider::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+    .modal-img-slider::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+
+    .modal-slider-img {
+      scroll-snap-align: center;
+      flex: 0 0 100%;
+      width: 100%;
+      height: 280px;
+      object-fit: cover;
+      border-radius: 12px;
+      background-color: #f8fafc;
+    }
+
+    .image-badge-count {
+      position: absolute;
+      bottom: 15px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header ด้านบน -->
+  <header>
+    <a href="#" class="brand-logo">Jielipeelie</a>
+    <div class="header-icons">
+      <a href="admin.html" class="icon-btn" title="ระบบหลังบ้าน">🔒</a>
+      <button class="icon-btn" onclick="switchTab('cart')">
+        🛒 <span class="cart-badge" id="cart-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- แท็บเมนูสลับหน้า -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" id="tab-btn-shop" onclick="switchTab('shop')">Shop</button>
+    <button class="tab-btn" id="tab-btn-cart" onclick="switchTab('cart')">Cart</button>
+    <button class="tab-btn" id="tab-btn-checkout" onclick="switchTab('checkout')">Checkout</button>
+  </div>
+
+  <!-- เนื้อหาหลัก -->
+  <main>
+    <!-- 1. TAB: SHOP -->
+    <div id="tab-shop" class="tab-content active">
+      <div class="hero-banner">
+        <h2>สั่งของดีจากทั่วโลก</h2>
+        <p>พรีออเดอร์สินค้าคุณภาพ ส่งตรงถึงมือคุณ</p>
+        <button class="hero-btn" onclick="document.getElementById('products-section').scrollIntoView({behavior: 'smooth'})">เลือกซื้อสินค้า</button>
+      </div>
+
+      <h3 class="section-title" id="products-section">สินค้าพรีออเดอร์</h3>
+      <div id="products-list" class="products-grid">กำลังโหลดรายการสินค้า...</div>
+    </div>
+
+    <!-- 2. TAB: CART -->
+    <div id="tab-cart" class="tab-content">
+      <h3 class="section-title">ตะกร้าสินค้า</h3>
+      <div id="cart-items-container">
+        <!-- รายการสินค้าใส่ตระกร้าจะถูก Render ตรงนี้ -->
+      </div>
+      
+      <div class="cart-summary" id="cart-summary-box" style="display: none;">
+        <div class="total-price">รวม: <span id="cart-total-price">฿0</span></div>
+        <button class="btn-primary" style="width: auto; padding: 10px 30px;" onclick="switchTab('checkout')">สั่งซื้อ</button>
+      </div>
+    </div>
+
+    <!-- 3. TAB: CHECKOUT -->
+    <div id="tab-checkout" class="tab-content">
+      <div class="checkout-container">
+        <h3 class="section-title">กรอกข้อมูลสั่งซื้อ</h3>
+        <form id="checkout-form" onsubmit="handleFormSubmit(event)">
+          <div class="form-group">
+            <label>ชื่อ-นามสกุล</label>
+            <input type="text" id="cust-name" class="text-input" placeholder="กรอกชื่อ-นามสกุล" required>
+          </div>
+
+          <div class="form-group">
+            <label>ที่อยู่จัดส่ง</label>
+            <input type="text" id="cust-address" class="text-input" placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์" required>
+          </div>
+
+          <div class="form-group">
+            <label>เบอร์โทรศัพท์</label>
+            <input type="tel" id="cust-phone" class="text-input" placeholder="08X-XXX-XXXX" required>
+          </div>
+
+          <div class="form-group">
+            <label>Line Name / ชื่อไลน์คุณ</label>
+            <input type="text" id="cust-line" class="text-input" placeholder="เช่น Sm,s" required>
+          </div>
+
+          <div class="price-display-box">
+            ยอดสินค้า: <span id="checkout-total-price">฿0</span>
+          </div>
+
+          <button type="submit" class="btn-primary">ส่งออเดอร์</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    © 2026 Jielipeelie — พรีออเดอร์สินค้าคุณภาพจากทั่วโลก
+  </footer>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal 1: ป๊อปอัปรายละเอียดสินค้า (รองรับการเลื่อนดูรูปหลายรูป) -->
+  <div id="product-modal" class="modal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('product-modal')">&times;</button>
+      <h3 id="modal-p-title" class="section-title" style="margin-bottom:12px;">ชื่อสินค้า</h3>
+      
+      <!-- Slider รูปภาพสินค้าหลายรูป -->
+      <div class="modal-img-slider-container">
+        <div id="modal-p-img-slider" class="modal-img-slider">
+          <!-- Render รูปภาพสินค้าจะถูกใส่ตรงนี้ -->
+        </div>
+        <div id="modal-img-count-badge" class="image-badge-count" style="display:none;">1/1</div>
+      </div>
+      
+      <div id="modal-p-price" class="product-price" style="margin-bottom:10px; color:#4f46e5; font-size:20px; font-weight:700;">฿0</div>
+
+      <div class="form-group">
+        <label>เลือกตัวเลือกสินค้า</label>
+        <select id="modal-p-variant" class="select-input" onchange="updateModalPrice()">
+          <!-- โหลดตัวเลือกจาก products_item (t_code -> t_price) -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>จำนวน</label>
+        <div class="qty-control">
+          <button class="qty-btn" onclick="adjustModalQty(-1)">-</button>
+          <span class="qty-val" id="modal-qty-val">1</span>
+          <button class="qty-btn" onclick="adjustModalQty(1)">+</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="confirmAddToCart()">เพิ่มลงตะกร้า</button>
+      <button class="btn-secondary" onclick="closeModal('product-modal')">ยกเลิก</button>
+    </div>
+  </div>
+
+  <!-- Modal 2: ป๊อปอัปยืนยันชื่อ LINE -->
+  <div id="line-confirm-modal" class="modal">
+    <div class="modal-card text-center">
+      <div class="confirm-icon-circle icon-warning-circle">⚠️</div>
+      <h3 style="font-size:18px; font-weight:700; color:#1f2937;">⚠️ ตรวจสอบชื่อ LINE ก่อนส่ง!</h3>
+      <p style="font-size:13px; color:#6b7280; margin-top:6px;">
+        ระบบจะเรียกชำระเงินผ่าน LINE ตามชื่อที่คุณกรอก<br>กรุณาตรวจสอบให้ถูกต้อง
+      </p>
+
+      <div class="line-highlight-box">
+        <div style="font-size:12px; color:#d97706;">ชื่อ LINE ที่คุณกรอก:</div>
+        <div class="line-name-val" id="confirm-line-name">Sm,s</div>
+      </div>
+
+      <p style="font-size:12px; color:#dc2626; font-weight:500; margin-bottom:15px;">
+        หากชื่อ LINE ไม่ถูกต้อง ระบบจะไม่สามารถส่ง<br>ข้อความเรียกเก็บเงินถึงคุณได้
+      </p>
+
+      <button class="btn-primary btn-green" onclick="processOrderInsertion()">ยืนยัน ชื่อ LINE ถูกต้อง</button>
+      <button class="btn-secondary" onclick="closeModal('line-confirm-modal')">กลับไปแก้ไข</button>
+    </div>
+  </div>
+
+  <!-- Modal 3: ป๊อปอัปส่งออเดอร์สำเร็จ -->
+  <div id="success-modal" class="modal">
+    <div class="modal-card text-center">
+      <div class="confirm-icon-circle icon-success-circle">✓</div>
+      <h3 style="font-size:20px; font-weight:700; margin-bottom:8px;">ส่งออเดอร์สำเร็จ!</h3>
+      <p style="font-size:13px; color:#6b7280; margin-bottom:20px;">
+        รอแอดมินยืนยันออเดอร์ และเรียกชำระเงินผ่าน LINE
+      </p>
+      <button class="btn-primary" onclick="finishOrder()">ตกลง</button>
+    </div>
+  </div>
+
+  <!-- Script เชื่อมต่อ Supabase Config -->
+  <script src="js/config.js"></script>
+
+  <script>
+    // Global States
+    let productsData = [];
+    let optionsMap = {}; // แมป t_code -> { code, price }
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    let selectedProduct = null;
+    let modalQty = 1;
+
+    // 🛠️ ฟังก์ชันแปลงลิงก์ Google Drive ให้เป็น URL รูปภาพ
+    function formatDriveUrl(url) {
+      if (!url) return '';
+      if (url.includes('drive.google.com')) {
+        const matchFileD = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (matchFileD && matchFileD[1]) {
+          return `https://lh3.googleusercontent.com/d/${matchFileD[1]}`;
+        }
+        const matchIdParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (matchIdParam && matchIdParam[1]) {
+          return `https://lh3.googleusercontent.com/d/${matchIdParam[1]}`;
+        }
+      }
+      return url;
+    }
+
+    // 🛠️ ฟังก์ชันคำนวณช่วงราคา (Price Range) สำหรับการ์ดสินค้าหน้าแรก
+    function getPriceRangeText(pCodeArray) {
+      if (!pCodeArray || !Array.isArray(pCodeArray) || pCodeArray.length === 0) {
+        return '฿0';
+      }
+
+      const prices = pCodeArray
+        .map(code => optionsMap[code]?.price)
+        .filter(price => price !== undefined && price !== null);
+
+      if (prices.length === 0) return '฿0';
+
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+
+      if (minPrice === maxPrice) {
+        return `฿${minPrice.toLocaleString()}`;
+      } else {
+        return `฿${minPrice.toLocaleString()} - ฿${maxPrice.toLocaleString()}`;
+      }
+    }
+
+    // --- Tab Switching Navigation ---
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      document.getElementById(`tab-btn-${tabName}`).classList.add('active');
+
+      if (tabName === 'cart') renderCartUI();
+      if (tabName === 'checkout') renderCheckoutUI();
+      window.scrollTo(0, 0);
+    }
+
+    // --- โหลดข้อมูลสินค้า (products) และตัวเลือก (products_item) จาก Supabase ---
+    async function loadData() {
+      const container = document.getElementById('products-list');
+      try {
+        // 1. ดึงข้อมูลตัวเลือกทั้งหมดจากตาราง products_item
+        const { data: itemsData, error: itemsErr } = await supabase.from('products_item').select('*');
+        if (!itemsErr && itemsData) {
+          itemsData.forEach(item => {
+            optionsMap[item.t_code] = {
+              code: item.t_code,
+              price: item.t_price ?? 0
+            };
+          });
+        }
+
+        // 2. ดึงข้อมูลสินค้าจากตาราง products
+        const { data: pData, error: pErr } = await supabase.from('products').select('*');
+        if (pErr) throw pErr;
+
+        productsData = pData || [];
+
+        if (productsData.length === 0) {
+          container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#9ca3af;">ไม่มีสินค้าในระบบ</p>';
+          return;
+        }
+
+        // แสดงผลการ์ดสินค้า (แสดงช่วงราคา และรูปภาพแรกสุด)
+        container.innerHTML = productsData.map(p => {
+          let coverImage = 'https://via.placeholder.com/300';
+          if (Array.isArray(p.image_url) && p.image_url.length > 0) {
+            coverImage = formatDriveUrl(p.image_url[0]);
+          } else if (typeof p.image_url === 'string' && p.image_url) {
+            coverImage = formatDriveUrl(p.image_url);
+          }
+
+          const imageCount = (Array.isArray(p.image_url) && p.image_url.length > 1) 
+            ? `<span style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;">📸 ${p.image_url.length} รูป</span>` 
+            : '';
+
+          // คำนวณข้อความช่วงราคา
+          const priceText = getPriceRangeText(p.p_code_a);
+
+          return `
+            <div class="product-card" onclick="openProductModal('${p.p_id}')" style="position:relative;">
+              ${imageCount}
+              <img src="${coverImage}" alt="${p.p_name}">
+              <div class="product-info">
+                <div class="product-title">${p.p_name}</div>
+                <div class="product-price">${priceText}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#ef4444;">เกิดข้อผิดพลาดในการโหลดสินค้า</p>';
+      }
+    }
+
+    // --- Modal Operations ---
+    function openProductModal(pId) {
+      selectedProduct = productsData.find(p => p.p_id === pId);
+      if (!selectedProduct) return;
+
+      modalQty = 1;
+      document.getElementById('modal-qty-val').innerText = modalQty;
+      document.getElementById('modal-p-title').innerText = selectedProduct.p_name;
+
+      // จัดการรูปภาพสินค้าทั้งหมด
+      let imagesList = [];
+      if (Array.isArray(selectedProduct.image_url) && selectedProduct.image_url.length > 0) {
+        imagesList = selectedProduct.image_url.map(url => formatDriveUrl(url));
+      } else if (typeof selectedProduct.image_url === 'string' && selectedProduct.image_url) {
+        imagesList = [formatDriveUrl(selectedProduct.image_url)];
+      } else {
+        imagesList = ['https://via.placeholder.com/300'];
+      }
+
+      // Render รูปภาพลงใน Slider
+      const sliderContainer = document.getElementById('modal-p-img-slider');
+      sliderContainer.innerHTML = imagesList.map(url => `
+        <img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img">
+      `).join('');
+
+      // แสดง Badge ปริมาณรูปภาพ
+      const badge = document.getElementById('modal-img-count-badge');
+      if (imagesList.length > 1) {
+        badge.innerText = `1 / ${imagesList.length} (ปัดซ้าย-ขวาเพื่อดูรูป)`;
+        badge.style.display = 'block';
+      } else {
+        badge.style.display = 'none';
+      }
+
+      // เติม Option ลงใน Select ตาม p_code_a (Array) ของสินค้านั้น
+      const variantSelect = document.getElementById('modal-p-variant');
+      variantSelect.innerHTML = '';
+
+      if (selectedProduct.p_code_a && selectedProduct.p_code_a.length > 0) {
+        selectedProduct.p_code_a.forEach(code => {
+          const itemOpt = optionsMap[code];
+          const price = itemOpt ? itemOpt.price : 0;
+          variantSelect.innerHTML += `<option value="${code}">${code} (฿${price.toLocaleString()})</option>`;
+        });
+      } else {
+        variantSelect.innerHTML = `<option value="DEFAULT">สินค้ามาตรฐาน</option>`;
+      }
+
+      // อัปเดตราคาป๊อปอัปตามตัวเลือกแรกสุด
+      updateModalPrice();
+
+      document.getElementById('product-modal').style.display = 'flex';
+    }
+
+    // 🛠️ อัปเดตราคาใน Modal เมื่อมีการเปลี่ยนตัวเลือก
+    function updateModalPrice() {
+      const tCode = document.getElementById('modal-p-variant').value;
+      const itemOpt = optionsMap[tCode];
+      const price = itemOpt ? itemOpt.price : 0;
+      document.getElementById('modal-p-price').innerText = `฿${price.toLocaleString()}`;
+    }
+
+    function adjustModalQty(val) {
+      modalQty += val;
+      if (modalQty < 1) modalQty = 1;
+      document.getElementById('modal-qty-val').innerText = modalQty;
+    }
+
+    function confirmAddToCart() {
+      if (!selectedProduct) return;
+      const tCode = document.getElementById('modal-p-variant').value;
+      const itemOpt = optionsMap[tCode];
+      const price = itemOpt ? itemOpt.price : 0;
+
+      const existingIndex = cart.findIndex(item => item.p_id === selectedProduct.p_id && item.t_code === tCode);
+      if (existingIndex > -1) {
+        cart[existingIndex].quantity += modalQty;
+      } else {
+        cart.push({
+          p_id: selectedProduct.p_id,
+          p_name: selectedProduct.p_name,
+          p_price: price, // บันทึกราคา t_price จริงของตัวเลือกนี้
+          t_code: tCode,
+          t_name: tCode,
+          quantity: modalQty
+        });
+      }
+
+      saveCart();
+      closeModal('product-modal');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    // --- Cart Management ---
+    function saveCart() {
+      localStorage.setItem('cart', JSON.stringify(cart));
+      updateCartBadge();
+    }
+
+    function updateCartBadge() {
+      const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0);
+      document.getElementById('cart-count').innerText = totalQty;
+    }
+
+    function renderCartUI() {
+      const container = document.getElementById('cart-items-container');
+      const summaryBox = document.getElementById('cart-summary-box');
+
+      if (cart.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:#9ca3af; margin-top:30px;">ตะกร้าสินค้าของคุณยังว่างเปล่า</p>';
+        summaryBox.style.display = 'none';
+        return;
+      }
+
+      summaryBox.style.display = 'flex';
+      container.innerHTML = cart.map((item, idx) => `
+        <div class="cart-item-row">
+          <div>
+            <div style="font-weight:600;">${item.p_name} <span style="font-size:13px; color:#6b7280;">(${item.t_name})</span></div>
+            <div style="color:#4f46e5; font-weight:700; font-size:14px; margin-top:2px;">฿${item.p_price.toLocaleString()}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:15px;">
+            <div class="qty-control">
+              <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
+              <span class="qty-val">${item.quantity}</span>
+              <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
+            </div>
+            <button onclick="removeCartItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px;">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+
+      const total = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
+      document.getElementById('cart-total-price').innerText = `฿${total.toLocaleString()}`;
+    }
+
+    function updateCartQty(index, delta) {
+      cart[index].quantity += delta;
+      if (cart[index].quantity <= 0) {
+        cart.splice(index, 1);
+      }
+      saveCart();
+      renderCartUI();
+    }
+
+    function removeCartItem(index) {
+      cart.splice(index, 1);
+      saveCart();
+      renderCartUI();
+    }
+
+    // --- Checkout & Form Submissions ---
+    function renderCheckoutUI() {
+      const total = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
+      document.getElementById('checkout-total-price').innerText = `฿${total.toLocaleString()}`;
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      if (cart.length === 0) {
+        alert('กรุณาเลือกสินค้าลงตะกร้าก่อนสั่งซื้อ');
+        switchTab('shop');
+        return;
+      }
+
+      const lineName = document.getElementById('cust-line').value;
+      document.getElementById('confirm-line-name').innerText = lineName;
+      document.getElementById('line-confirm-modal').style.display = 'flex';
+    }
+
+    // --- บันทึกออเดอร์ลงตาราง orders และ order_items ---
+    async function processOrderInsertion() {
+      closeModal('line-confirm-modal');
+      const totalAmount = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
+
+      const custName = document.getElementById('cust-name').value;
+      const custAddress = document.getElementById('cust-address').value;
+      const custPhone = document.getElementById('cust-phone').value;
+      const custLine = document.getElementById('cust-line').value;
+
+      try {
+        // 1. บันทึกลงตาราง orders
+        const { data: orderData, error: orderErr } = await supabase.from('orders').insert([{
+          o_name: custName,
+          o_phone: custPhone,
+          o_line: custLine,
+          o_address: custAddress,
+          o_subdistrict: '-',
+          o_district: '-',
+          o_province: '-',
+          o_zipcode: '-',
+          o_total: totalAmount,
+          o_status: 'pending'
+        }]).select().single();
+
+        if (orderErr) throw orderErr;
+
+        // 2. บันทึกลงตาราง order_items
+        const itemsToInsert = cart.map(item => ({
+          order_id: orderData.o_id,
+          p_code_a: item.t_code,
+          quantity: item.quantity,
+          price: item.p_price
+        }));
+
+        const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
+        if (itemsErr) throw itemsErr;
+
+        // แสดง Modal สำเร็จ
+        document.getElementById('success-modal').style.display = 'flex';
+
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการบันทึกคำสั่งซื้อ: ' + err.message);
+      }
+    }
+
+    function finishOrder() {
+      cart = [];
+      saveCart();
+      document.getElementById('checkout-form').reset();
+      closeModal('success-modal');
+      switchTab('shop');
+    }
+
+    // Initialize
+    updateCartBadge();
+    loadData();
+  </script>
+</body>
+</html>
