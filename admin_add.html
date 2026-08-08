@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เพิ่มสินค้า & ตัวเลือก - ShopAdmin</title>
+  
+  <link rel="stylesheet" href="css/admin-style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    .multi-select-box {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #fff;
+    }
+    .img-preview-thumb {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .img-preview-thumb:hover {
+      transform: scale(1.1);
+    }
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .date-range-box {
+      background-color: #fffbeb;
+      border: 1px solid #fef3c7;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="admin-header">
+    <a href="admin.html" class="brand-logo">
+      🛒 ShopAdmin <span>SELLER</span>
+    </a>
+    <div id="header-actions">
+      <a href="admin.html" class="btn btn-secondary btn-sm">⬅️ กลับหน้าจัดการคำสั่งซื้อ</a>
+    </div>
+  </header>
+
+  <main class="admin-container">
+
+    <!-- Card 1: เพิ่มตัวเลือกสินค้า -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">🏷️ 1. เพิ่มตัวเลือกสินค้า (products_item)</div>
+        <div class="admin-card-subtitle">สร้างรหัสตัวเลือกและกำหนดราคาของตัวเลือกนั้นๆ เพื่อนำไปเลือกใช้ในสินค้าหลัก</div>
+      </div>
+      
+      <form onsubmit="handleAddProductItem(event)">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>รหัสตัวเลือก (t_code)</label>
+            <input type="text" id="t-code" class="text-input" placeholder="เช่น T001, RED, SIZE-L" required>
+          </div>
+          <div class="form-group">
+            <label>ราคาตัวเลือก (t_price)</label>
+            <input type="number" id="t-price" class="text-input" placeholder="เช่น 150" step="0.01" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">➕ บันทึกตัวเลือก</button>
+      </form>
+
+      <div style="margin-top: 18px; padding-top: 15px; border-top: 1px solid #f3f4f6;">
+        <div style="font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 8px;">ตัวเลือกที่มีในระบบปัจจุบัน:</div>
+        <div id="items-tag-list"><span style="color:#9ca3af; font-size:13px;">กำลังโหลด...</span></div>
+      </div>
+    </div>
+
+    <!-- Card 2: เพิ่มสินค้าใหม่ -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title">📦 2. เพิ่มสินค้าใหม่ (products)</div>
+        <div class="admin-card-subtitle">ใส่ข้อมูลสินค้า รูปภาพ ประเภทสินค้า และเลือกตัวเลือกสินค้าที่เกี่ยวข้อง</div>
+      </div>
+
+      <form onsubmit="handleAddProduct(event)">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>ชื่อสินค้า (p_name)</label>
+            <input type="text" id="p-name" class="text-input" placeholder="เช่น เสื้อยืดลายแฟชั่น" required>
+          </div>
+          <div class="form-group">
+            <label>จำนวนสต็อกเริ่มต้น (stock)</label>
+            <input type="number" id="p-stock" class="text-input" placeholder="เช่น 50" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>ประเภทสินค้า (p_type)</label>
+          <select id="p-type" class="select-input" onchange="togglePreorderDates('add')" required>
+            <option value="ready">พร้อมส่ง</option>
+            <option value="preorder">พรีออเดอร์</option>
+          </select>
+        </div>
+
+        <!-- เพิ่มส่วนระบุวันที่สำหรับพรีออเดอร์ -->
+        <div id="preorder-dates-box" class="date-range-box" style="display: none;">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>📅 วันที่และเวลาเริ่มต้นพรีออเดอร์</label>
+              <input type="datetime-local" id="p-preorder-start" class="text-input">
+            </div>
+            <div class="form-group">
+              <label>📅 วันที่และเวลาสิ้นสุดพรีออเดอร์</label>
+              <input type="datetime-local" id="p-preorder-end" class="text-input">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label>URL รูปภาพสินค้า (รองรับ Google Drive Direct Link / ใส่แยกบรรทัดเพื่อเพิ่มหลายรูป)</label>
+          <textarea id="p-image" class="text-input" rows="3" placeholder="https://drive.google.com/file/d/xxxx/view&#10;https://example.com/image2.jpg"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>เลือกตัวเลือกที่ใช้กับสินค้านี้ (p_code_a)</label>
+          <input type="text" id="p-code-search" class="text-input" placeholder="🔍 ค้นหารหัสตัวเลือก..." oninput="filterCheckboxes()" style="margin-bottom: 6px;">
+          <div id="item-checkboxes" class="checkbox-grid multi-select-box">
+            <span style="color:#9ca3af; font-size:13px;">กำลังโหลดตัวเลือก...</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="margin-top: 10px;">✨ บันทึกเพิ่มสินค้า</button>
+      </form>
+    </div>
+
+    <!-- Card 3: สินค้าทั้งหมด & จัดการสต็อก -->
+    <div class="admin-card">
+      <div class="admin-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div class="admin-card-title">🗂️ สินค้าทั้งหมด & จัดการสต็อก</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-size: 14px; font-weight: 600; color: #374151;">กรองประเภท:</label>
+          <select id="filter-p-type" class="select-input" style="width: auto; padding: 4px 10px;" onchange="filterProductsByType()">
+            <option value="all">ทั้งหมด</option>
+            <option value="ready">พร้อมส่ง</option>
+            <option value="preorder">พรีออเดอร์</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รูปภาพ</th>
+              <th>ชื่อสินค้า</th>
+              <th>ประเภท</th>
+              <th>ช่วงเวลาพรีออเดอร์</th>
+              <th>ตัวเลือกสินค้า</th>
+              <th style="width: 100px;">คลังสต็อก</th>
+              <th style="width: 180px;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="admin-products-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal แก้ไขสินค้า -->
+  <div id="edit-product-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <h3>✏️ แก้ไขข้อมูลสินค้า</h3>
+      <form onsubmit="handleSaveEditProduct(event)">
+        <input type="hidden" id="edit-p-id">
+        <div class="form-group">
+          <label>ชื่อสินค้า</label>
+          <input type="text" id="edit-p-name" class="text-input" required>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>จำนวนสต็อก</label>
+            <input type="number" id="edit-p-stock" class="text-input" required>
+          </div>
+          <div class="form-group">
+            <label>ประเภทสินค้า</label>
+            <select id="edit-p-type" class="select-input" onchange="togglePreorderDates('edit')" required>
+              <option value="ready">พร้อมส่ง</option>
+              <option value="preorder">พรีออเดอร์</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- เพิ่มส่วนระบุวันที่ใน Modal แก้ไข -->
+        <div id="edit-preorder-dates-box" class="date-range-box" style="display: none;">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>📅 วันที่และเวลาเริ่มต้นพรีออเดอร์</label>
+              <input type="datetime-local" id="edit-p-preorder-start" class="text-input">
+            </div>
+            <div class="form-group">
+              <label>📅 วันที่และเวลาสิ้นสุดพรีออเดอร์</label>
+              <input type="datetime-local" id="edit-p-preorder-end" class="text-input">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label>URL รูปภาพ (แยกบรรทัด)</label>
+          <textarea id="edit-p-image" class="text-input" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>ตัวเลือกสินค้า (p_code_a)</label>
+          <input type="text" id="edit-p-code-search" class="text-input" placeholder="🔍 ค้นหา..." oninput="filterEditCheckboxes()" style="margin-bottom: 6px;">
+          <div id="edit-item-checkboxes" class="checkbox-grid multi-select-box"></div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 15px;">
+          <button type="button" onclick="closeEditModal()" class="btn btn-secondary btn-sm">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm">บันทึกการแก้ไข</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal ดูรูปภาพขนาดเต็ม -->
+  <div id="image-modal" class="modal-backdrop" style="display: none;" onclick="closeImageModal()">
+    <div class="modal-card" style="text-align: center; background: transparent; box-shadow: none;">
+      <img id="full-image" src="" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <p style="color: #fff; margin-top: 10px; font-size: 14px;">(คลิกที่ใดก็ได้เพื่อปิด)</p>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+
+  <script>
+    let globalItemsList = [];
+    let globalProductsList = [];
+
+    // ฟังก์ชัน ซ่อน/แสดง วันที่พรีออเดอร์
+    function togglePreorderDates(mode) {
+      if (mode === 'add') {
+        const type = document.getElementById('p-type').value;
+        const box = document.getElementById('preorder-dates-box');
+        box.style.display = (type === 'preorder') ? 'block' : 'none';
+      } else if (mode === 'edit') {
+        const type = document.getElementById('edit-p-type').value;
+        const box = document.getElementById('edit-preorder-dates-box');
+        box.style.display = (type === 'preorder') ? 'block' : 'none';
+      }
+    }
+
+    function formatDriveUrl(url) {
+      if (!url) return '';
+      if (url.includes('drive.google.com')) {
+        const matchFileD = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (matchFileD && matchFileD[1]) return `https://lh3.googleusercontent.com/d/${matchFileD[1]}`;
+        const matchIdParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (matchIdParam && matchIdParam[1]) return `https://lh3.googleusercontent.com/d/${matchIdParam[1]}`;
+      }
+      return url;
+    }
+
+    function formatDateDisplay(dateTimeStr) {
+      if (!dateTimeStr) return '-';
+      const d = new Date(dateTimeStr);
+      return d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function formatIsoToInput(dateTimeStr) {
+      if (!dateTimeStr) return '';
+      const d = new Date(dateTimeStr);
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    }
+
+    function checkAuth() {
+      const isLoggedIn = localStorage.getItem('isAdminLoggedIn');
+      if (isLoggedIn !== 'true') {
+        window.location.href = 'admin.html';
+      }
+    }
+
+    async function loadProductItems() {
+      const { data: items } = await supabase.from('products_item').select('*');
+      globalItemsList = items || [];
+
+      const tagList = document.getElementById('items-tag-list');
+      if (globalItemsList.length === 0) {
+        tagList.innerHTML = '<span style="color:#9ca3af; font-size:13px;">ยังไม่มีตัวเลือกในระบบ</span>';
+      } else {
+        tagList.innerHTML = globalItemsList.map(item => `
+          <span class="tag-badge">${item.t_code} (฿${item.t_price ?? 0})</span>
+        `).join('');
+      }
+
+      renderCheckboxes(globalItemsList, 'item-checkboxes');
+    }
+
+    async function loadProductsList() {
+      const { data: products } = await supabase.from('products').select('*');
+      globalProductsList = products || [];
+      filterProductsByType();
+    }
+
+    function renderProductsTable(products) {
+      document.getElementById('admin-products-list').innerHTML = products.map(p => {
+        const codesText = (p.p_code_a && p.p_code_a.length > 0) 
+          ? p.p_code_a.map(c => `<span class="tag-badge">${c}</span>`).join('') 
+          : '<span style="color:#9ca3af;">-</span>';
+        
+        let imagesHtml = '<span style="color:#9ca3af; font-size:12px;">ไม่มีรูป</span>';
+        if (p.image_url && Array.isArray(p.image_url) && p.image_url.length > 0) {
+          const firstImg = formatDriveUrl(p.image_url[0]);
+          imagesHtml = `<img src="${firstImg}" width="48" height="48" class="img-preview-thumb" style="object-fit:cover; border-radius:8px;" onclick="openImageModal('${firstImg}')">`;
+        }
+
+        const pTypeBadge = p.p_type === 'preorder' 
+          ? '<span style="background:#fef3c7; color:#d97706; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">พรีออเดอร์</span>'
+          : '<span style="background:#d1fae5; color:#059669; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">พร้อมส่ง</span>';
+
+        const dateRangeHtml = p.p_type === 'preorder'
+          ? `<div style="font-size:11px; color:#4b5563;">
+               <b>เริ่ม:</b> ${formatDateDisplay(p.preorder_start)}<br>
+               <b>จบ:</b> ${formatDateDisplay(p.preorder_end)}
+             </div>`
+          : '<span style="color:#9ca3af;">-</span>';
+
+        return `
+          <tr>
+            <td>${imagesHtml}</td>
+            <td><strong>${p.p_name}</strong></td>
+            <td>${pTypeBadge}</td>
+            <td>${dateRangeHtml}</td>
+            <td>${codesText}</td>
+            <td>
+              <input type="number" value="${p.stock}" id="stock-${p.p_id}" class="text-input" style="padding: 4px 8px; font-weight:600;">
+            </td>
+            <td>
+              <div style="display:flex; gap:6px;">
+                <button onclick="updateStock('${p.p_id}')" class="btn btn-primary btn-sm">บันทึกสต็อก</button>
+                <button onclick="openEditModal('${p.p_id}')" class="btn btn-secondary btn-sm">แก้ไข</button>
+                <button onclick="deleteProduct('${p.p_id}')" class="btn btn-danger btn-sm">ลบ</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterProductsByType() {
+      const selectedType = document.getElementById('filter-p-type').value;
+      if (selectedType === 'all') {
+        renderProductsTable(globalProductsList);
+      } else {
+        const filtered = globalProductsList.filter(p => p.p_type === selectedType);
+        renderProductsTable(filtered);
+      }
+    }
+
+    function renderCheckboxes(items, containerId, selectedCodes = []) {
+      const checkboxContainer = document.getElementById(containerId);
+      if (!items || items.length === 0) {
+        checkboxContainer.innerHTML = '<span style="color:#9ca3af; font-size:13px;">ไม่พบตัวเลือก</span>';
+        return;
+      }
+      checkboxContainer.innerHTML = items.map(item => {
+        const isChecked = selectedCodes.includes(item.t_code) ? 'checked' : '';
+        return `
+          <label class="checkbox-item" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <input type="checkbox" name="${containerId}_select" value="${item.t_code}" ${isChecked}>
+            <span>${item.t_code} (฿${item.t_price ?? 0})</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function filterCheckboxes() {
+      const search = document.getElementById('p-code-search').value.toLowerCase();
+      const filtered = globalItemsList.filter(item => item.t_code.toLowerCase().includes(search));
+      const checkedVals = Array.from(document.querySelectorAll('input[name="item-checkboxes_select"]:checked')).map(cb => cb.value);
+      renderCheckboxes(filtered, 'item-checkboxes', checkedVals);
+    }
+
+    function filterEditCheckboxes() {
+      const search = document.getElementById('edit-p-code-search').value.toLowerCase();
+      const filtered = globalItemsList.filter(item => item.t_code.toLowerCase().includes(search));
+      const checkedVals = Array.from(document.querySelectorAll('input[name="edit-item-checkboxes_select"]:checked')).map(cb => cb.value);
+      renderCheckboxes(filtered, 'edit-item-checkboxes', checkedVals);
+    }
+
+    async function handleAddProductItem(e) {
+      e.preventDefault();
+      const tCode = document.getElementById('t-code').value.trim();
+      const tPrice = parseFloat(document.getElementById('t-price').value);
+
+      const { error } = await supabase.from('products_item').insert([{ t_code: tCode, t_price: tPrice }]);
+
+      if (error) {
+        alert('เพิ่มตัวเลือกไม่สำเร็จ (รหัส t_code อาจซ้ำกัน): ' + error.message);
+      } else {
+        alert('เพิ่มตัวเลือกเรียบร้อย');
+        document.getElementById('t-code').value = '';
+        document.getElementById('t-price').value = '';
+        loadProductItems();
+      }
+    }
+
+    async function handleAddProduct(e) {
+      e.preventDefault();
+      const rawImageInput = document.getElementById('p-image').value;
+      const imageUrls = rawImageInput.split(/[\n,]+/).map(url => formatDriveUrl(url.trim())).filter(url => url.length > 0);
+      const selectedCodes = Array.from(document.querySelectorAll('input[name="item-checkboxes_select"]:checked')).map(cb => cb.value);
+      
+      const pType = document.getElementById('p-type').value;
+      const startDate = pType === 'preorder' ? document.getElementById('p-preorder-start').value || null : null;
+      const endDate = pType === 'preorder' ? document.getElementById('p-preorder-end').value || null : null;
+
+      const { error } = await supabase.from('products').insert([{
+        p_name: document.getElementById('p-name').value,
+        stock: parseInt(document.getElementById('p-stock').value),
+        p_type: pType,
+        preorder_start: startDate,
+        preorder_end: endDate,
+        image_url: imageUrls,
+        p_code_a: selectedCodes
+      }]);
+
+      if (error) {
+        alert('เพิ่มสินค้าไม่สำเร็จ: ' + error.message);
+      } else { 
+        alert('เพิ่มสินค้าเรียบร้อย'); 
+        e.target.reset();
+        togglePreorderDates('add');
+        loadProductItems();
+        loadProductsList();
+      }
+    }
+
+    function openEditModal(pId) {
+      const product = globalProductsList.find(p => p.p_id == pId);
+      if (!product) return;
+
+      document.getElementById('edit-p-id').value = product.p_id;
+      document.getElementById('edit-p-name').value = product.p_name || '';
+      document.getElementById('edit-p-stock').value = product.stock || 0;
+      document.getElementById('edit-p-type').value = product.p_type || 'ready';
+      
+      document.getElementById('edit-p-preorder-start').value = formatIsoToInput(product.preorder_start);
+      document.getElementById('edit-p-preorder-end').value = formatIsoToInput(product.preorder_end);
+      
+      togglePreorderDates('edit');
+
+      const imgs = Array.isArray(product.image_url) ? product.image_url.join('\n') : (product.image_url || '');
+      document.getElementById('edit-p-image').value = imgs;
+
+      renderCheckboxes(globalItemsList, 'edit-item-checkboxes', product.p_code_a || []);
+      document.getElementById('edit-product-modal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-product-modal').style.display = 'none';
+    }
+
+    async function handleSaveEditProduct(e) {
+      e.preventDefault();
+      const pId = document.getElementById('edit-p-id').value;
+      const rawImageInput = document.getElementById('edit-p-image').value;
+      const imageUrls = rawImageInput.split(/[\n,]+/).map(url => formatDriveUrl(url.trim())).filter(url => url.length > 0);
+      const selectedCodes = Array.from(document.querySelectorAll('input[name="edit-item-checkboxes_select"]:checked')).map(cb => cb.value);
+
+      const pType = document.getElementById('edit-p-type').value;
+      const startDate = pType === 'preorder' ? document.getElementById('edit-p-preorder-start').value || null : null;
+      const endDate = pType === 'preorder' ? document.getElementById('edit-p-preorder-end').value || null : null;
+
+      const updateData = {
+        p_name: document.getElementById('edit-p-name').value,
+        stock: parseInt(document.getElementById('edit-p-stock').value),
+        p_type: pType,
+        preorder_start: startDate,
+        preorder_end: endDate,
+        image_url: imageUrls,
+        p_code_a: selectedCodes
+      };
+
+      const { error } = await supabase.from('products').update(updateData).eq('p_id', pId);
+
+      if (error) {
+        alert('แก้ไขสินค้าไม่สำเร็จ: ' + error.message);
+      } else {
+        alert('อัปเดตข้อมูลสินค้าเรียบร้อย');
+        closeEditModal();
+        loadProductsList();
+      }
+    }
+
+    async function deleteProduct(pId) {
+      if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?')) return;
+      const { error } = await supabase.from('products').delete().eq('p_id', pId);
+      if (error) alert('ลบสินค้าไม่สำเร็จ: ' + error.message);
+      else { alert('ลบสินค้าเรียบร้อย'); loadProductsList(); }
+    }
+
+    async function updateStock(pId) {
+      const newStock = document.getElementById(`stock-${pId}`).value;
+      const { error } = await supabase.from('products').update({ stock: parseInt(newStock) }).eq('p_id', pId);
+      if (error) alert('อัปเดตสต็อกไม่สำเร็จ: ' + error.message);
+      else alert('อัปเดตสต็อกเรียบร้อย');
+    }
+
+    function openImageModal(url) {
+      document.getElementById('full-image').src = url;
+      document.getElementById('image-modal').style.display = 'flex';
+    }
+    function closeImageModal() {
+      document.getElementById('image-modal').style.display = 'none';
+    }
+
+    checkAuth();
+    loadProductItems();
+    loadProductsList();
+  </script>
+</body>
+</html>
