@@ -16,8 +16,52 @@
   <!-- นำเข้าไฟล์ CSS -->
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- สไตล์สำหรับระบบเลื่อนสไลด์รูปภาพใน Modal -->
+  <!-- สไตล์เพิ่มเติมสำหรับ Badge และ Category Bar -->
   <style>
+    /* Category Filter Bar */
+    .category-bar-container {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 10px 0;
+      margin-bottom: 20px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .category-btn {
+      background-color: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      font-family: 'Prompt', sans-serif;
+    }
+    .category-btn:hover {
+      background-color: #e2e8f0;
+    }
+    .category-btn.active {
+      background-color: #4f46e5;
+      color: white;
+      border-color: #4f46e5;
+    }
+
+    /* Badge สำหรับแสดง p_type */
+    .type-badge {
+      display: inline-block;
+      background-color: #e0e7ff;
+      color: #4338ca;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 12px;
+      margin-bottom: 6px;
+    }
+
+    /* Image Slider ใน Modal */
     .modal-img-slider-container {
       position: relative;
       margin-bottom: 12px;
@@ -33,7 +77,6 @@
       padding-bottom: 6px;
     }
 
-    /* Custom Scrollbar สำหรับ Slider */
     .modal-img-slider::-webkit-scrollbar {
       height: 6px;
     }
@@ -46,7 +89,6 @@
       border-radius: 10px;
     }
 
-    /* ปรับ object-fit ให้เป็น contain เพื่อโชว์ภาพเต็มรูป ไม่โดนครอบ/ตัดขอบ */
     .modal-slider-img {
       scroll-snap-align: center;
       flex: 0 0 100%;
@@ -69,7 +111,6 @@
       pointer-events: none;
     }
 
-    /* กริดสำหรับจัดรูปแบบฟิลด์ที่อยู่ */
     .address-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -114,6 +155,13 @@
       </div>
 
       <h3 class="section-title" id="products-section">สินค้าพรีออเดอร์</h3>
+      
+      <!-- หมวดหมู่สินค้า / Category Bar (แสดง p_type ให้เลือกกรอง) -->
+      <div id="category-bar" class="category-bar-container">
+        <button class="category-btn active" onclick="filterByCategory('ALL')">ทั้งหมด</button>
+        <!-- ปุ่มประเภท p_type จะถูกดึงมาจาก Supabase และ Render ตรงนี้ -->
+      </div>
+
       <div id="products-list" class="products-grid">กำลังโหลดรายการสินค้า...</div>
     </div>
 
@@ -121,7 +169,7 @@
     <div id="tab-cart" class="tab-content">
       <h3 class="section-title">ตะกร้าสินค้า</h3>
       <div id="cart-items-container">
-        <!-- รายการสินค้าใส่ตระกร้าจะถูก Render ตรงนี้ -->
+        <!-- รายการสินค้าในตระกร้า -->
       </div>
       
       <div class="cart-summary" id="cart-summary-box" style="display: none;">
@@ -140,7 +188,6 @@
             <input type="text" id="cust-name" class="text-input" placeholder="กรอกชื่อ-นามสกุล" required>
           </div>
 
-          <!-- แยกที่อยู่ตามฟิลด์ในตาราง orders -->
           <div class="form-group">
             <label>ที่อยู่ / บ้านเลขที่ / ซอย / ถนน</label>
             <input type="text" id="cust-address" class="text-input" placeholder="เช่น 123/45 หมู่ 2 ถ.สุขุมวิท" required>
@@ -193,19 +240,20 @@
     © 2026 Jielipeelie — พรีออเดอร์สินค้าคุณภาพจากทั่วโลก
   </footer>
 
-  <!-- ==================== MODALS ==================== -->
+  <!-- MODALS -->
 
   <!-- Modal 1: ป๊อปอัปรายละเอียดสินค้า -->
   <div id="product-modal" class="modal">
     <div class="modal-card">
       <button class="modal-close" onclick="closeModal('product-modal')">&times;</button>
+      
+      <!-- แสดง p_type ใน Modal -->
+      <div id="modal-p-type-badge"></div>
+      
       <h3 id="modal-p-title" class="section-title" style="margin-bottom:12px;">ชื่อสินค้า</h3>
       
-      <!-- Slider รูปภาพสินค้าหลายรูป -->
       <div class="modal-img-slider-container">
-        <div id="modal-p-img-slider" class="modal-img-slider">
-          <!-- Render รูปภาพสินค้าจะถูกใส่ตรงนี้ -->
-        </div>
+        <div id="modal-p-img-slider" class="modal-img-slider"></div>
         <div id="modal-img-count-badge" class="image-badge-count" style="display:none;">1/1</div>
       </div>
       
@@ -213,9 +261,7 @@
 
       <div class="form-group">
         <label>เลือกตัวเลือกสินค้า</label>
-        <select id="modal-p-variant" class="select-input" onchange="updateModalPrice()">
-          <!-- โหลดตัวเลือกจาก products_item -->
-        </select>
+        <select id="modal-p-variant" class="select-input" onchange="updateModalPrice()"></select>
       </div>
 
       <div class="form-group">
@@ -232,86 +278,73 @@
     </div>
   </div>
 
-  <!-- Modal 2: ป๊อปอัปยืนยันชื่อ LINE -->
+  <!-- Modal 2 & 3 -->
   <div id="line-confirm-modal" class="modal">
     <div class="modal-card text-center">
       <div class="confirm-icon-circle icon-warning-circle">⚠️</div>
       <h3 style="font-size:18px; font-weight:700; color:#1f2937;">⚠️ ตรวจสอบชื่อ LINE ก่อนส่ง!</h3>
-      <p style="font-size:13px; color:#6b7280; margin-top:6px;">
-        ระบบจะเรียกชำระเงินผ่าน LINE ตามชื่อที่คุณกรอก<br>กรุณาตรวจสอบให้ถูกต้อง
-      </p>
-
+      <p style="font-size:13px; color:#6b7280; margin-top:6px;">ระบบจะเรียกชำระเงินผ่าน LINE ตามชื่อที่คุณกรอก</p>
       <div class="line-highlight-box">
         <div style="font-size:12px; color:#d97706;">ชื่อ LINE ที่คุณกรอก:</div>
         <div class="line-name-val" id="confirm-line-name">Sm,s</div>
       </div>
-
-      <p style="font-size:12px; color:#dc2626; font-weight:500; margin-bottom:15px;">
-        หากชื่อ LINE ไม่ถูกต้อง ระบบจะไม่สามารถส่ง<br>ข้อความเรียกเก็บเงินถึงคุณได้
-      </p>
-
       <button class="btn-primary btn-green" onclick="processOrderInsertion()">ยืนยัน ชื่อ LINE ถูกต้อง</button>
       <button class="btn-secondary" onclick="closeModal('line-confirm-modal')">กลับไปแก้ไข</button>
     </div>
   </div>
 
-  <!-- Modal 3: ป๊อปอัปส่งออเดอร์สำเร็จ -->
   <div id="success-modal" class="modal">
     <div class="modal-card text-center">
       <div class="confirm-icon-circle icon-success-circle">✓</div>
       <h3 style="font-size:20px; font-weight:700; margin-bottom:8px;">ส่งออเดอร์สำเร็จ!</h3>
-      <p style="font-size:13px; color:#6b7280; margin-bottom:20px;">
-        รอแอดมินยืนยันออเดอร์ และเรียกชำระเงินผ่าน LINE
-      </p>
+      <p style="font-size:13px; color:#6b7280; margin-bottom:20px;">รอแอดมินยืนยันออเดอร์ และเรียกชำระเงินผ่าน LINE</p>
       <button class="btn-primary" onclick="finishOrder()">ตกลง</button>
     </div>
   </div>
 
-  <!-- Script เชื่อมต่อ Supabase Config -->
   <script src="js/config.js"></script>
 
   <script>
-    // Global States
     let productsData = [];
+    let filteredProducts = [];
     let optionsMap = {}; 
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     let selectedProduct = null;
     let modalQty = 1;
+    let selectedCategory = 'ALL';
+
+    // ฟังก์ชันสำหรับแปลงค่า p_type ให้แสดงผลเป็นภาษาไทย (รองรับ ready, preorder ทุกรูปแบบ)
+    function getTypeNameTH(type) {
+      if (!type) return '';
+      const cleanType = type.toString().trim().toLowerCase();
+      
+      if (cleanType === 'ready' || cleanType === 'ready_to_ship' || cleanType === 'instock' || cleanType === 'พร้อมส่ง') {
+        return 'พร้อมส่ง';
+      }
+      if (cleanType === 'preorder' || cleanType === 'pre_order' || cleanType === 'พรีออเดอร์') {
+        return 'พรีออเดอร์';
+      }
+      return type;
+    }
 
     function formatDriveUrl(url) {
       if (!url) return '';
       if (url.includes('drive.google.com')) {
         const matchFileD = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if (matchFileD && matchFileD[1]) {
-          return `https://lh3.googleusercontent.com/d/${matchFileD[1]}`;
-        }
+        if (matchFileD && matchFileD[1]) return `https://lh3.googleusercontent.com/d/${matchFileD[1]}`;
         const matchIdParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        if (matchIdParam && matchIdParam[1]) {
-          return `https://lh3.googleusercontent.com/d/${matchIdParam[1]}`;
-        }
+        if (matchIdParam && matchIdParam[1]) return `https://lh3.googleusercontent.com/d/${matchIdParam[1]}`;
       }
       return url;
     }
 
     function getPriceRangeText(pCodeArray) {
-      if (!pCodeArray || !Array.isArray(pCodeArray) || pCodeArray.length === 0) {
-        return '฿0';
-      }
-
-      const prices = pCodeArray
-        .map(code => optionsMap[code]?.price)
-        .filter(price => price !== undefined && price !== null);
-
+      if (!pCodeArray || !Array.isArray(pCodeArray) || pCodeArray.length === 0) return '฿0';
+      const prices = pCodeArray.map(code => optionsMap[code]?.price).filter(price => price !== undefined && price !== null);
       if (prices.length === 0) return '฿0';
-
       const minPrice = Math.min(...prices);
       const maxPrice = Math.max(...prices);
-
-      if (minPrice === maxPrice) {
-        return `฿${minPrice.toLocaleString()}`;
-      } else {
-        return `฿${minPrice.toLocaleString()} - ฿${maxPrice.toLocaleString()}`;
-      }
+      return minPrice === maxPrice ? `฿${minPrice.toLocaleString()}` : `฿${minPrice.toLocaleString()} - ฿${maxPrice.toLocaleString()}`;
     }
 
     function switchTab(tabName) {
@@ -329,13 +362,10 @@
     async function loadData() {
       const container = document.getElementById('products-list');
       try {
-        const { data: itemsData, error: itemsErr } = await supabase.from('products_item').select('*');
-        if (!itemsErr && itemsData) {
+        const { data: itemsData } = await supabase.from('products_item').select('*');
+        if (itemsData) {
           itemsData.forEach(item => {
-            optionsMap[item.t_code] = {
-              code: item.t_code,
-              price: item.t_price ?? 0
-            };
+            optionsMap[item.t_code] = { code: item.t_code, price: item.t_price ?? 0 };
           });
         }
 
@@ -343,42 +373,83 @@
         if (pErr) throw pErr;
 
         productsData = pData || [];
-
-        if (productsData.length === 0) {
-          container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#9ca3af;">ไม่มีสินค้าในระบบ</p>';
-          return;
-        }
-
-        container.innerHTML = productsData.map(p => {
-          let coverImage = 'https://via.placeholder.com/300';
-          if (Array.isArray(p.image_url) && p.image_url.length > 0) {
-            coverImage = formatDriveUrl(p.image_url[0]);
-          } else if (typeof p.image_url === 'string' && p.image_url) {
-            coverImage = formatDriveUrl(p.image_url);
-          }
-
-          const imageCount = (Array.isArray(p.image_url) && p.image_url.length > 1) 
-            ? `<span style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;">📸 ${p.image_url.length} รูป</span>` 
-            : '';
-
-          const priceText = getPriceRangeText(p.p_code_a);
-
-          return `
-            <div class="product-card" onclick="openProductModal('${p.p_id}')" style="position:relative;">
-              ${imageCount}
-              <img src="${coverImage}" alt="${p.p_name}" style="object-fit: contain;">
-              <div class="product-info">
-                <div class="product-title">${p.p_name}</div>
-                <div class="product-price">${priceText}</div>
-              </div>
-            </div>
-          `;
-        }).join('');
+        
+        // สร้าง Category Filter Bar
+        renderCategoryBar();
+        
+        // แสดงสินค้า
+        renderProducts(productsData);
 
       } catch (err) {
         console.error(err);
         container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#ef4444;">เกิดข้อผิดพลาดในการโหลดสินค้า</p>';
       }
+    }
+
+    // ฟังก์ชันสร้างปุ่มตัวกรองประเภทสินค้า p_type (แปลง ready/preorder เป็นภาษาไทย)
+    function renderCategoryBar() {
+      const categoryBar = document.getElementById('category-bar');
+      // ดึง p_type ทั้งหมดที่เป็นค่าไม่ว่าง และลบค่าที่ซ้ำออก
+      const types = [...new Set(productsData.map(p => p.p_type).filter(type => type && type.toString().trim() !== ''))];
+      
+      let html = `<button class="category-btn ${selectedCategory === 'ALL' ? 'active' : ''}" onclick="filterByCategory('ALL')">ทั้งหมด</button>`;
+      
+      types.forEach(type => {
+        const displayName = getTypeNameTH(type);
+        html += `<button class="category-btn ${selectedCategory === type ? 'active' : ''}" onclick="filterByCategory('${type}')">${displayName}</button>`;
+      });
+
+      categoryBar.innerHTML = html;
+    }
+
+    // ฟังก์ชันกรองสินค้าตามประเภท
+    function filterByCategory(category) {
+      selectedCategory = category;
+      renderCategoryBar(); // อัปเดตสถานะปุ่ม active
+      
+      if (category === 'ALL') {
+        filteredProducts = productsData;
+      } else {
+        filteredProducts = productsData.filter(p => p.p_type === category);
+      }
+      
+      renderProducts(filteredProducts);
+    }
+
+    // ฟังก์ชัน Render การ์ดสินค้าบนหน้าเว็บ
+    function renderProducts(list) {
+      const container = document.getElementById('products-list');
+      
+      if (list.length === 0) {
+        container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#9ca3af;">ไม่มีสินค้าในประเภทนี้</p>';
+        return;
+      }
+
+      container.innerHTML = list.map(p => {
+        let coverImage = 'https://via.placeholder.com/300';
+        if (Array.isArray(p.image_url) && p.image_url.length > 0) coverImage = formatDriveUrl(p.image_url[0]);
+        else if (typeof p.image_url === 'string' && p.image_url) coverImage = formatDriveUrl(p.image_url);
+
+        const imageCount = (Array.isArray(p.image_url) && p.image_url.length > 1) 
+          ? `<span style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;">📸 ${p.image_url.length} รูป</span>` 
+          : '';
+
+        // แสดง Badge p_type แปลง ready/preorder เป็นภาษาไทย
+        const typeBadge = p.p_type ? `<span class="type-badge">${getTypeNameTH(p.p_type)}</span>` : '';
+        const priceText = getPriceRangeText(p.p_code_a);
+
+        return `
+          <div class="product-card" onclick="openProductModal('${p.p_id}')" style="position:relative;">
+            ${imageCount}
+            <img src="${coverImage}" alt="${p.p_name}" style="object-fit: contain;">
+            <div class="product-info">
+              ${typeBadge}
+              <div class="product-title">${p.p_name}</div>
+              <div class="product-price">${priceText}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function openProductModal(pId) {
@@ -388,6 +459,14 @@
       modalQty = 1;
       document.getElementById('modal-qty-val').innerText = modalQty;
       document.getElementById('modal-p-title').innerText = selectedProduct.p_name;
+
+      // แสดง p_type ใน Modal แปลงเป็นภาษาไทย
+      const typeBadgeBox = document.getElementById('modal-p-type-badge');
+      if (selectedProduct.p_type) {
+        typeBadgeBox.innerHTML = `<span class="type-badge">${getTypeNameTH(selectedProduct.p_type)}</span>`;
+      } else {
+        typeBadgeBox.innerHTML = '';
+      }
 
       let imagesList = [];
       if (Array.isArray(selectedProduct.image_url) && selectedProduct.image_url.length > 0) {
@@ -399,9 +478,7 @@
       }
 
       const sliderContainer = document.getElementById('modal-p-img-slider');
-      sliderContainer.innerHTML = imagesList.map(url => `
-        <img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img">
-      `).join('');
+      sliderContainer.innerHTML = imagesList.map(url => `<img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img">`).join('');
 
       const badge = document.getElementById('modal-img-count-badge');
       if (imagesList.length > 1) {
@@ -454,6 +531,7 @@
         cart.push({
           p_id: selectedProduct.p_id,
           p_name: selectedProduct.p_name,
+          p_type: selectedProduct.p_type || '',
           p_price: price,
           t_code: tCode,
           t_name: tCode,
@@ -490,22 +568,32 @@
       }
 
       summaryBox.style.display = 'flex';
-      container.innerHTML = cart.map((item, idx) => `
-        <div class="cart-item-row">
-          <div>
-            <div style="font-weight:600;">${item.p_name} <span style="font-size:13px; color:#6b7280;">(${item.t_name})</span></div>
-            <div style="color:#4f46e5; font-weight:700; font-size:14px; margin-top:2px;">฿${item.p_price.toLocaleString()}</div>
-          </div>
-          <div style="display:flex; align-items:center; gap:15px;">
-            <div class="qty-control">
-              <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
-              <span class="qty-val">${item.quantity}</span>
-              <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
+      container.innerHTML = cart.map((item, idx) => {
+        const typeBadge = item.p_type 
+          ? `<span style="background-color:#e0e7ff; color:#4338ca; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:500; margin-left:6px;">${getTypeNameTH(item.p_type)}</span>` 
+          : '';
+
+        return `
+          <div class="cart-item-row">
+            <div>
+              <div style="font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                ${item.p_name} 
+                <span style="font-size:13px; color:#6b7280;">(${item.t_name})</span>
+                ${typeBadge}
+              </div>
+              <div style="color:#4f46e5; font-weight:700; font-size:14px; margin-top:2px;">฿${item.p_price.toLocaleString()}</div>
             </div>
-            <button onclick="removeCartItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px;">🗑️</button>
+            <div style="display:flex; align-items:center; gap:15px;">
+              <div class="qty-control">
+                <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
+                <span class="qty-val">${item.quantity}</span>
+                <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
+              </div>
+              <button onclick="removeCartItem(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px;">🗑️</button>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       const total = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
       document.getElementById('cart-total-price').innerText = `฿${total.toLocaleString()}`;
@@ -513,9 +601,7 @@
 
     function updateCartQty(index, delta) {
       cart[index].quantity += delta;
-      if (cart[index].quantity <= 0) {
-        cart.splice(index, 1);
-      }
+      if (cart[index].quantity <= 0) cart.splice(index, 1);
       saveCart();
       renderCartUI();
     }
@@ -538,44 +624,31 @@
         switchTab('shop');
         return;
       }
-
       const lineName = document.getElementById('cust-line').value;
       document.getElementById('confirm-line-name').innerText = lineName;
       document.getElementById('line-confirm-modal').style.display = 'flex';
     }
 
-    // --- บันทึกออเดอร์ลงตาราง orders (แยกฟิลด์ที่อยู่) และ order_items ---
     async function processOrderInsertion() {
       closeModal('line-confirm-modal');
       const totalAmount = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
 
-      const custName = document.getElementById('cust-name').value;
-      const custAddress = document.getElementById('cust-address').value;
-      const custSubdistrict = document.getElementById('cust-subdistrict').value;
-      const custDistrict = document.getElementById('cust-district').value;
-      const custProvince = document.getElementById('cust-province').value;
-      const custZipcode = document.getElementById('cust-zipcode').value;
-      const custPhone = document.getElementById('cust-phone').value;
-      const custLine = document.getElementById('cust-line').value;
-
       try {
-        // 1. บันทึกลงตาราง orders โดยแยกแต่ละคอลัมน์
         const { data: orderData, error: orderErr } = await supabase.from('orders').insert([{
-          o_name: custName,
-          o_phone: custPhone,
-          o_line: custLine,
-          o_address: custAddress,
-          o_subdistrict: custSubdistrict,
-          o_district: custDistrict,
-          o_province: custProvince,
-          o_zipcode: custZipcode,
+          o_name: document.getElementById('cust-name').value,
+          o_phone: document.getElementById('cust-phone').value,
+          o_line: document.getElementById('cust-line').value,
+          o_address: document.getElementById('cust-address').value,
+          o_subdistrict: document.getElementById('cust-subdistrict').value,
+          o_district: document.getElementById('cust-district').value,
+          o_province: document.getElementById('cust-province').value,
+          o_zipcode: document.getElementById('cust-zipcode').value,
           o_total: totalAmount,
           o_status: 'pending'
         }]).select().single();
 
         if (orderErr) throw orderErr;
 
-        // 2. บันทึกลงตาราง order_items
         const itemsToInsert = cart.map(item => ({
           order_id: orderData.o_id,
           p_code_a: item.t_code,
@@ -586,7 +659,6 @@
         const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
         if (itemsErr) throw itemsErr;
 
-        // แสดง Modal สำเร็จ
         document.getElementById('success-modal').style.display = 'flex';
 
       } catch (err) {
