@@ -216,8 +216,19 @@
 
     <!-- Card 3: ตารางจัดการสินค้า & สต็อก -->
     <div class="admin-card">
-      <div class="admin-card-header">
-        <div class="admin-card-title">🗂️ 3. สินค้าทั้งหมด & จัดการสต็อก</div>
+      <div class="admin-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div class="admin-card-title">🗂️ 3. สินค้าทั้งหมด & จัดการสต็อก</div>
+        </div>
+        <!-- ตัวกรองประเภทสินค้าภาษาไทย -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-size: 14px; font-weight: 600; color: #374151;">กรองประเภท:</label>
+          <select id="filter-p-type" class="select-input" style="width: auto; padding: 4px 10px;" onchange="filterProductsByType()">
+            <option value="all">ทั้งหมด</option>
+            <option value="ready">พร้อมส่ง</option>
+            <option value="preorder">พรีออเดอร์</option>
+          </select>
+        </div>
       </div>
 
       <div class="table-responsive">
@@ -489,12 +500,9 @@
       }
     }
 
-    async function loadAdminData() {
-      await loadProductItems();
-      const { data: products } = await supabase.from('products').select('*');
-      globalProductsList = products || [];
-      
-      document.getElementById('admin-products-list').innerHTML = globalProductsList.map(p => {
+    /* ฟังก์ชันการแสดงผลตารางสินค้า */
+    function renderProductsTable(products) {
+      document.getElementById('admin-products-list').innerHTML = products.map(p => {
         const codesText = (p.p_code_a && p.p_code_a.length > 0) 
           ? p.p_code_a.map(c => `<span class="tag-badge">${c}</span>`).join('') 
           : '<span style="color:#9ca3af;">-</span>';
@@ -528,6 +536,25 @@
           </tr>
         `;
       }).join('');
+    }
+
+    /* กรองสินค้าตามประเภท (พร้อมส่ง / พรีออเดอร์) */
+    function filterProductsByType() {
+      const selectedType = document.getElementById('filter-p-type').value;
+      if (selectedType === 'all') {
+        renderProductsTable(globalProductsList);
+      } else {
+        const filtered = globalProductsList.filter(p => p.p_type === selectedType);
+        renderProductsTable(filtered);
+      }
+    }
+
+    async function loadAdminData() {
+      await loadProductItems();
+      const { data: products } = await supabase.from('products').select('*');
+      globalProductsList = products || [];
+      
+      filterProductsByType();
 
       const { data: orders } = await supabase.from('orders').select('*').order('o_date', { ascending: false });
       globalOrdersList = orders || [];
