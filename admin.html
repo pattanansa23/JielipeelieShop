@@ -10,6 +10,100 @@
   
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* CSS เพิ่มเติมสำหรับ Modal และ UI */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .receipt-box {
+      font-family: monospace, monospace;
+      background: #f9fafb;
+      border: 1px dashed #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-size: 14px;
+      color: #111827;
+      margin-bottom: 15px;
+      page-break-inside: avoid; /* ป้องกันการฉีกขาดของใบเสร็จกลางแผ่นเวลาพิมพ์ */
+    }
+    .img-preview-thumb {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .img-preview-thumb:hover {
+      transform: scale(1.1);
+    }
+    .multi-select-box {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #fff;
+    }
+    .bulk-action-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 6px;
+    }
+
+    /* 🖨️ CSS สำหรับการสั่งพิมพ์ (Print Style) */
+    @media print {
+      /* ซ่อนส่วนประกอบหลังบ้านทั้งหมด */
+      body * {
+        visibility: hidden;
+      }
+      /* แสดงเฉพาะกล่อง Modal และข้อมูลภายในใบเสร็จ */
+      #order-details-modal, #order-details-modal * {
+        visibility: visible;
+      }
+      #order-details-modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: transparent;
+        display: block !important;
+      }
+      .modal-card {
+        box-shadow: none;
+        border: none;
+        max-width: 100%;
+        width: 100%;
+        padding: 0;
+      }
+      /* ซ่อนปุ่มกดต่างๆ ในหน้าต่างสั่งพิมพ์ */
+      .no-print {
+        display: none !important;
+      }
+      .receipt-box {
+        border: 1px solid #000;
+        background: #fff;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -24,7 +118,7 @@
     </div>
   </header>
 
-  <!-- 1. ส่วนเข้าสู่ระบบ (แสดงเมื่อยังไม่ได้ล็อกอิน) -->
+  <!-- 1. ส่วนเข้าสู่ระบบ -->
   <div id="login-section" class="login-wrapper">
     <div class="login-card">
       <h2>ยินดีต้อนรับกลับ 👋</h2>
@@ -46,7 +140,7 @@
     </div>
   </div>
 
-  <!-- 2. แผงควบคุมหลังบ้าน Main Dashboard (แสดงเมื่อล็อกอินแล้ว) -->
+  <!-- 2. แผงควบคุมหลังบ้าน Main Dashboard -->
   <main id="admin-panel" class="admin-container" style="display: none;">
 
     <!-- Card 1: เพิ่มตัวเลือกสินค้า -->
@@ -80,7 +174,7 @@
     <div class="admin-card">
       <div class="admin-card-header">
         <div class="admin-card-title">📦 2. เพิ่มสินค้าใหม่ (products)</div>
-        <div class="admin-card-subtitle">ใส่ข้อมูลสินค้า รูปภาพ และเลือกตัวเลือกสินค้าที่เกี่ยวข้อง</div>
+        <div class="admin-card-subtitle">ใส่ข้อมูลสินค้า รูปภาพ ประเภทสินค้า และเลือกตัวเลือกสินค้าที่เกี่ยวข้อง</div>
       </div>
 
       <form onsubmit="handleAddProduct(event)">
@@ -96,13 +190,22 @@
         </div>
 
         <div class="form-group">
+          <label>ประเภทสินค้า (p_type)</label>
+          <select id="p-type" class="select-input" required>
+            <option value="ready">พร้อมส่ง</option>
+            <option value="preorder">พรีออเดอร์</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label>URL รูปภาพสินค้า (รองรับ Google Drive Direct Link / ใส่แยกบรรทัดเพื่อเพิ่มหลายรูป)</label>
           <textarea id="p-image" class="text-input" rows="3" placeholder="https://drive.google.com/file/d/xxxx/view&#10;https://example.com/image2.jpg"></textarea>
         </div>
 
         <div class="form-group">
           <label>เลือกตัวเลือกที่ใช้กับสินค้านี้ (p_code_a)</label>
-          <div id="item-checkboxes" class="checkbox-grid">
+          <input type="text" id="p-code-search" class="text-input" placeholder="🔍 ค้นหารหัสตัวเลือก..." oninput="filterCheckboxes()" style="margin-bottom: 6px;">
+          <div id="item-checkboxes" class="checkbox-grid multi-select-box">
             <span style="color:#9ca3af; font-size:13px;">กำลังโหลดตัวเลือก...</span>
           </div>
         </div>
@@ -123,9 +226,10 @@
             <tr>
               <th>รูปภาพ</th>
               <th>ชื่อสินค้า</th>
+              <th>ประเภท</th>
               <th>ตัวเลือกสินค้า</th>
-              <th style="width: 130px;">คลังสต็อก</th>
-              <th style="width: 160px;">จัดการ</th>
+              <th style="width: 100px;">คลังสต็อก</th>
+              <th style="width: 180px;">จัดการ</th>
             </tr>
           </thead>
           <tbody id="admin-products-list"></tbody>
@@ -139,10 +243,19 @@
         <div class="admin-card-title">📋 4. รายการสั่งซื้อจากลูกค้า (orders)</div>
       </div>
 
+      <!-- แถบเครื่องมือจัดการหลายออเดอร์ -->
+      <div class="bulk-action-bar">
+        <label style="display:flex; align-items:center; gap:6px; font-size:14px; cursor:pointer;">
+          <input type="checkbox" id="select-all-orders" onchange="toggleSelectAllOrders(this)"> <strong>เลือกทั้งหมด</strong>
+        </label>
+        <button onclick="viewSelectedOrders()" class="btn btn-primary btn-sm">📋 ดูรายละเอียดที่เลือก (<span id="selected-count">0</span>)</button>
+      </div>
+
       <div class="table-responsive">
         <table class="custom-table">
           <thead>
             <tr>
+              <th style="width: 40px; text-align: center;">เลือก</th>
               <th>วันที่/เวลา</th>
               <th>ชื่อลูกค้า</th>
               <th>LINE ID</th>
@@ -159,12 +272,79 @@
 
   </main>
 
+  <!-- Modal แก้ไขสินค้า -->
+  <div id="edit-product-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <h3>✏️ แก้ไขข้อมูลสินค้า</h3>
+      <form onsubmit="handleSaveEditProduct(event)">
+        <input type="hidden" id="edit-p-id">
+        <div class="form-group">
+          <label>ชื่อสินค้า</label>
+          <input type="text" id="edit-p-name" class="text-input" required>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>จำนวนสต็อก</label>
+            <input type="number" id="edit-p-stock" class="text-input" required>
+          </div>
+          <div class="form-group">
+            <label>ประเภทสินค้า</label>
+            <select id="edit-p-type" class="select-input" required>
+              <option value="ready">พร้อมส่ง</option>
+              <option value="preorder">พรีออเดอร์</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>URL รูปภาพ (แยกบรรทัด)</label>
+          <textarea id="edit-p-image" class="text-input" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>ตัวเลือกสินค้า (p_code_a)</label>
+          <input type="text" id="edit-p-code-search" class="text-input" placeholder="🔍 ค้นหา..." oninput="filterEditCheckboxes()" style="margin-bottom: 6px;">
+          <div id="edit-item-checkboxes" class="checkbox-grid multi-select-box"></div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 15px;">
+          <button type="button" onclick="closeEditModal()" class="btn btn-secondary btn-sm">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm">บันทึกการแก้ไข</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal ดูรูปภาพขนาดเต็ม -->
+  <div id="image-modal" class="modal-backdrop" style="display: none;" onclick="closeImageModal()">
+    <div class="modal-card" style="text-align: center; background: transparent; box-shadow: none;">
+      <img id="full-image" src="" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <p style="color: #fff; margin-top: 10px; font-size: 14px;">(คลิกที่ใดก็ได้เพื่อปิด)</p>
+    </div>
+  </div>
+
+  <!-- Modal แสดงรายละเอียดออเดอร์ (รองรับพิมพ์/บันทึก PDF) -->
+  <div id="order-details-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin:0;" id="modal-order-title">📄 รายละเอียดคำสั่งซื้อ</h3>
+        <div style="display: flex; gap: 8px;" class="no-print">
+          <button onclick="window.print()" class="btn btn-primary btn-sm">🖨️ พิมพ์เอกสาร / บันทึก PDF</button>
+          <button onclick="closeOrderModal()" class="btn btn-secondary btn-sm">✕ ปิด</button>
+        </div>
+      </div>
+      
+      <!-- ข้อมูลใบเสร็จที่จะสั่งพิมพ์ -->
+      <div id="receipt-content"></div>
+      <div id="receipt-summary-footer" style="text-align: right; font-weight: bold; font-size: 16px; margin-top: 10px; padding-top: 10px; border-top: 2px solid #374151; display: none;"></div>
+    </div>
+  </div>
+
   <!-- Script ตั้งค่า Supabase -->
   <script src="js/config.js"></script>
 
   <!-- Script การทำงานฝั่งแอดมิน -->
   <script>
     let globalItemsList = [];
+    let globalProductsList = [];
+    let globalOrdersList = [];
 
     function formatDriveUrl(url) {
       if (!url) return '';
@@ -252,28 +432,50 @@
         `).join('');
       }
 
-      const checkboxContainer = document.getElementById('item-checkboxes');
-      if (globalItemsList.length === 0) {
-        checkboxContainer.innerHTML = '<span style="color:#9ca3af; font-size:13px;">โปรดเพิ่มตัวเลือกในข้อ 1 ก่อน</span>';
-      } else {
-        checkboxContainer.innerHTML = globalItemsList.map(item => `
-          <label class="checkbox-item">
-            <input type="checkbox" name="p_code_a_select" value="${item.t_code}">
+      renderCheckboxes(globalItemsList, 'item-checkboxes');
+    }
+
+    function renderCheckboxes(items, containerId, selectedCodes = []) {
+      const checkboxContainer = document.getElementById(containerId);
+      if (!items || items.length === 0) {
+        checkboxContainer.innerHTML = '<span style="color:#9ca3af; font-size:13px;">ไม่พบตัวเลือก</span>';
+        return;
+      }
+      checkboxContainer.innerHTML = items.map(item => {
+        const isChecked = selectedCodes.includes(item.t_code) ? 'checked' : '';
+        return `
+          <label class="checkbox-item" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <input type="checkbox" name="${containerId}_select" value="${item.t_code}" ${isChecked}>
             <span>${item.t_code} (฿${item.t_price ?? 0})</span>
           </label>
-        `).join('');
-      }
+        `;
+      }).join('');
+    }
+
+    function filterCheckboxes() {
+      const search = document.getElementById('p-code-search').value.toLowerCase();
+      const filtered = globalItemsList.filter(item => item.t_code.toLowerCase().includes(search));
+      const checkedVals = Array.from(document.querySelectorAll('input[name="item-checkboxes_select"]:checked')).map(cb => cb.value);
+      renderCheckboxes(filtered, 'item-checkboxes', checkedVals);
+    }
+
+    function filterEditCheckboxes() {
+      const search = document.getElementById('edit-p-code-search').value.toLowerCase();
+      const filtered = globalItemsList.filter(item => item.t_code.toLowerCase().includes(search));
+      const checkedVals = Array.from(document.querySelectorAll('input[name="edit-item-checkboxes_select"]:checked')).map(cb => cb.value);
+      renderCheckboxes(filtered, 'edit-item-checkboxes', checkedVals);
     }
 
     async function handleAddProduct(e) {
       e.preventDefault();
       const rawImageInput = document.getElementById('p-image').value;
       const imageUrls = rawImageInput.split(/[\n,]+/).map(url => formatDriveUrl(url.trim())).filter(url => url.length > 0);
-      const selectedCodes = Array.from(document.querySelectorAll('input[name="p_code_a_select"]:checked')).map(cb => cb.value);
+      const selectedCodes = Array.from(document.querySelectorAll('input[name="item-checkboxes_select"]:checked')).map(cb => cb.value);
 
       const { error } = await supabase.from('products').insert([{
         p_name: document.getElementById('p-name').value,
         stock: parseInt(document.getElementById('p-stock').value),
+        p_type: document.getElementById('p-type').value,
         image_url: imageUrls,
         p_code_a: selectedCodes
       }]);
@@ -290,28 +492,36 @@
     async function loadAdminData() {
       await loadProductItems();
       const { data: products } = await supabase.from('products').select('*');
+      globalProductsList = products || [];
       
-      document.getElementById('admin-products-list').innerHTML = (products || []).map(p => {
+      document.getElementById('admin-products-list').innerHTML = globalProductsList.map(p => {
         const codesText = (p.p_code_a && p.p_code_a.length > 0) 
           ? p.p_code_a.map(c => `<span class="tag-badge">${c}</span>`).join('') 
           : '<span style="color:#9ca3af;">-</span>';
         
         let imagesHtml = '<span style="color:#9ca3af; font-size:12px;">ไม่มีรูป</span>';
         if (p.image_url && Array.isArray(p.image_url) && p.image_url.length > 0) {
-          imagesHtml = `<img src="${formatDriveUrl(p.image_url[0])}" width="48" height="48" style="object-fit:cover; border-radius:8px;">`;
+          const firstImg = formatDriveUrl(p.image_url[0]);
+          imagesHtml = `<img src="${firstImg}" width="48" height="48" class="img-preview-thumb" style="object-fit:cover; border-radius:8px;" onclick="openImageModal('${firstImg}')">`;
         }
+
+        const pTypeBadge = p.p_type === 'preorder' 
+          ? '<span style="background:#fef3c7; color:#d97706; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">พรีออเดอร์</span>'
+          : '<span style="background:#d1fae5; color:#059669; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:600;">พร้อมส่ง</span>';
 
         return `
           <tr>
             <td>${imagesHtml}</td>
             <td><strong>${p.p_name}</strong></td>
+            <td>${pTypeBadge}</td>
             <td>${codesText}</td>
             <td>
               <input type="number" value="${p.stock}" id="stock-${p.p_id}" class="text-input" style="padding: 4px 8px; font-weight:600;">
             </td>
             <td>
               <div style="display:flex; gap:6px;">
-                <button onclick="updateStock('${p.p_id}')" class="btn btn-primary btn-sm">บันทึก</button>
+                <button onclick="updateStock('${p.p_id}')" class="btn btn-primary btn-sm">บันทึกสต็อก</button>
+                <button onclick="openEditModal('${p.p_id}')" class="btn btn-secondary btn-sm">แก้ไข</button>
                 <button onclick="deleteProduct('${p.p_id}')" class="btn btn-danger btn-sm">ลบ</button>
               </div>
             </td>
@@ -320,9 +530,13 @@
       }).join('');
 
       const { data: orders } = await supabase.from('orders').select('*').order('o_date', { ascending: false });
+      globalOrdersList = orders || [];
       
-      document.getElementById('admin-orders-list').innerHTML = (orders || []).map(o => `
+      document.getElementById('admin-orders-list').innerHTML = globalOrdersList.map(o => `
         <tr>
+          <td style="text-align: center;">
+            <input type="checkbox" class="order-checkbox" value="${o.o_id}" onchange="updateSelectedCount()">
+          </td>
           <td><small style="color:#6b7280;">${new Date(o.o_date).toLocaleString('th-TH')}</small></td>
           <td><strong>${o.o_name}</strong></td>
           <td><span style="color:#10b981; font-weight:600;">${o.o_line || '-'}</span></td>
@@ -342,6 +556,152 @@
           </td>
         </tr>
       `).join('');
+
+      updateSelectedCount();
+    }
+
+    /* ระบบจัดการคำสั่งซื้อแบบกลุ่ม (Multi-select) */
+    function toggleSelectAllOrders(masterCb) {
+      const checkboxes = document.querySelectorAll('.order-checkbox');
+      checkboxes.forEach(cb => cb.checked = masterCb.checked);
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const checkedBoxes = document.querySelectorAll('.order-checkbox:checked');
+      document.getElementById('selected-count').innerText = checkedBoxes.length;
+    }
+
+    async function viewSelectedOrders() {
+      const checkedBoxes = Array.from(document.querySelectorAll('.order-checkbox:checked'));
+      if (checkedBoxes.length === 0) {
+        alert('กรุณาติ๊กเลือกอย่างน้อย 1 รายการออเดอร์');
+        return;
+      }
+
+      const selectedIds = checkedBoxes.map(cb => cb.value);
+      
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .in('order_id', selectedIds);
+
+      if (error) {
+        alert('ไม่สามารถดึงข้อมูลรายการสินค้าได้: ' + error.message);
+        return;
+      }
+
+      let receiptsHtml = '';
+      let grandTotal = 0;
+
+      selectedIds.forEach((id) => {
+        const order = globalOrdersList.find(o => o.o_id == id);
+        if (!order) return;
+
+        const orderItems = items.filter(it => it.order_id == id);
+        
+        const fullAddress = [
+          order.o_address,
+          order.o_subdistrict ? `ต.${order.o_subdistrict}` : '',
+          order.o_district ? `อ.${order.o_district}` : '',
+          order.o_province ? `จ.${order.o_province}` : '',
+          order.o_zipcode
+        ].filter(Boolean).join(' ');
+
+        let itemsText = '';
+        let totalSum = 0;
+
+        if (orderItems.length > 0) {
+          itemsText = orderItems.map(item => {
+            const lineTotal = (item.quantity || 1) * (item.price || 0);
+            totalSum += lineTotal;
+            return `${item.p_code_a || '-'}\t${item.quantity || 1}\t${item.price || 0}`;
+          }).join('\n');
+        } else {
+          itemsText = 'ไม่มีรายการสินค้า';
+        }
+
+        const orderTotal = order.o_total || totalSum;
+        grandTotal += parseFloat(orderTotal);
+
+        const receiptTemplate = `ชื่อ ${order.o_name || '-'}
+ที่อยู่ ${fullAddress || '-'}
+เบอร์โทร ${order.o_phone || '-'}
+
+------------------------------
+สินค้าที่สั่ง
+รหัส\tจำนวน\tราคา
+${itemsText}
+
+รวม\t-\t${orderTotal}`;
+
+        receiptsHtml += `<div class="receipt-box">${receiptTemplate}</div>`;
+      });
+
+      document.getElementById('modal-order-title').innerText = `📋 รายละเอียดคำสั่งซื้อ (${selectedIds.length} รายการ)`;
+      document.getElementById('receipt-content').innerHTML = receiptsHtml;
+      
+      const footer = document.getElementById('receipt-summary-footer');
+      footer.style.display = 'block';
+      footer.innerHTML = `ยอดรวมสุทธิทั้งสิ้น (${selectedIds.length} ออเดอร์): <span style="color:#4f46e5; font-size:18px;">฿${grandTotal.toLocaleString()}</span>`;
+
+      document.getElementById('order-details-modal').style.display = 'flex';
+    }
+
+    /* Modal และระบบแก้ไขสินค้า */
+    function openEditModal(pId) {
+      const product = globalProductsList.find(p => p.p_id == pId);
+      if (!product) return;
+
+      document.getElementById('edit-p-id').value = product.p_id;
+      document.getElementById('edit-p-name').value = product.p_name || '';
+      document.getElementById('edit-p-stock').value = product.stock || 0;
+      document.getElementById('edit-p-type').value = product.p_type || 'ready';
+      
+      const imgs = Array.isArray(product.image_url) ? product.image_url.join('\n') : (product.image_url || '');
+      document.getElementById('edit-p-image').value = imgs;
+
+      renderCheckboxes(globalItemsList, 'edit-item-checkboxes', product.p_code_a || []);
+      document.getElementById('edit-product-modal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-product-modal').style.display = 'none';
+    }
+
+    async function handleSaveEditProduct(e) {
+      e.preventDefault();
+      const pId = document.getElementById('edit-p-id').value;
+      const rawImageInput = document.getElementById('edit-p-image').value;
+      const imageUrls = rawImageInput.split(/[\n,]+/).map(url => formatDriveUrl(url.trim())).filter(url => url.length > 0);
+      const selectedCodes = Array.from(document.querySelectorAll('input[name="edit-item-checkboxes_select"]:checked')).map(cb => cb.value);
+
+      const updateData = {
+        p_name: document.getElementById('edit-p-name').value,
+        stock: parseInt(document.getElementById('edit-p-stock').value),
+        p_type: document.getElementById('edit-p-type').value,
+        image_url: imageUrls,
+        p_code_a: selectedCodes
+      };
+
+      const { error } = await supabase.from('products').update(updateData).eq('p_id', pId);
+
+      if (error) {
+        alert('แก้ไขสินค้าไม่สำเร็จ: ' + error.message);
+      } else {
+        alert('อัปเดตข้อมูลสินค้าเรียบร้อย');
+        closeEditModal();
+        loadAdminData();
+      }
+    }
+
+    /* Modal ดูรูปภาพ */
+    function openImageModal(url) {
+      document.getElementById('full-image').src = url;
+      document.getElementById('image-modal').style.display = 'flex';
+    }
+    function closeImageModal() {
+      document.getElementById('image-modal').style.display = 'none';
     }
 
     async function deleteProduct(pId) {
@@ -383,14 +743,56 @@
       }
     }
 
+    /* ดูรายละเอียดออเดอร์รายการเดียว */
     async function viewOrderItems(oId) {
-      const { data: items, error } = await supabase.from('order_items').select('*').eq('order_id', oId);
-      if (error || !items) {
+      const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('o_id', oId).single();
+      const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('order_id', oId);
+
+      if (orderErr || itemsErr || !order) {
         alert('ไม่สามารถดึงข้อมูลรายการสินค้าได้');
         return;
       }
-      let summary = items.map(item => `• รหัสตัวเลือก: ${item.p_code_a} | จำนวน: ${item.quantity} | ราคา/ชิ้น: ฿${item.price}`).join('\n');
-      alert(`📦 รายการสินค้าในออเดอร์:\n\n${summary || 'ไม่มีรายการสินค้า'}`);
+
+      const fullAddress = [
+        order.o_address,
+        order.o_subdistrict ? `ต.${order.o_subdistrict}` : '',
+        order.o_district ? `อ.${order.o_district}` : '',
+        order.o_province ? `จ.${order.o_province}` : '',
+        order.o_zipcode
+      ].filter(Boolean).join(' ');
+
+      let itemsText = '';
+      let totalSum = 0;
+
+      if (items && items.length > 0) {
+        itemsText = items.map((item) => {
+          const lineTotal = (item.quantity || 1) * (item.price || 0);
+          totalSum += lineTotal;
+          return `${item.p_code_a || '-'}\t${item.quantity || 1}\t${item.price || 0}`;
+        }).join('\n');
+      } else {
+        itemsText = 'ไม่มีรายการสินค้า';
+      }
+
+      const receiptTemplate = `ชื่อ ${order.o_name || '-'}
+ที่อยู่ ${fullAddress || '-'}
+เบอร์โทร ${order.o_phone || '-'}
+
+------------------------------
+สินค้าที่สั่ง
+รหัส\tจำนวน\tราคา
+${itemsText}
+
+รวม\t-\t${order.o_total || totalSum}`;
+
+      document.getElementById('modal-order-title').innerText = `📄 รายละเอียดคำสั่งซื้อ`;
+      document.getElementById('receipt-content').innerHTML = `<div class="receipt-box">${receiptTemplate}</div>`;
+      document.getElementById('receipt-summary-footer').style.display = 'none';
+      document.getElementById('order-details-modal').style.display = 'flex';
+    }
+
+    function closeOrderModal() {
+      document.getElementById('order-details-modal').style.display = 'none';
     }
 
     checkUser();
