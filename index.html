@@ -16,8 +16,45 @@
   <!-- นำเข้าไฟล์ CSS -->
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- สไตล์เพิ่มเติมสำหรับ Badge และ Category Bar -->
+  <!-- สไตล์เพิ่มเติมสำหรับ Badge, Category Bar, Hero Banner และ Zoom Modal -->
   <style>
+    /* Hero Banner Style */
+    .hero-banner {
+      background-color: #8b93ff;
+      color: white;
+      padding: 30px 20px;
+      border-radius: 20px;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    .hero-banner h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .hero-banner p {
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 700px;
+      margin: 0 auto 18px auto;
+      opacity: 0.95;
+    }
+    .hero-btn {
+      background-color: white;
+      color: #4f46e5;
+      border: none;
+      padding: 8px 24px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: 'Prompt', sans-serif;
+      transition: transform 0.1s ease;
+    }
+    .hero-btn:active {
+      transform: scale(0.98);
+    }
+
     /* Category Filter Bar */
     .category-bar-container {
       display: flex;
@@ -97,6 +134,11 @@
       object-fit: contain;
       border-radius: 12px;
       background-color: #f8fafc;
+      cursor: zoom-in; /* เปลี่ยนเคอร์เซอร์เป็นไอคอนซูม */
+      transition: opacity 0.2s ease;
+    }
+    .modal-slider-img:hover {
+      opacity: 0.9;
     }
 
     .image-badge-count {
@@ -109,6 +151,46 @@
       border-radius: 12px;
       font-size: 11px;
       pointer-events: none;
+    }
+
+    /* --- Image Zoom Lightbox Modal --- */
+    .zoom-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.88);
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .zoom-modal-content {
+      max-width: 95%;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      animation: zoomIn 0.2s ease;
+    }
+    .zoom-modal-close {
+      position: absolute;
+      top: 20px;
+      right: 25px;
+      color: #ffffff;
+      font-size: 35px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 10000;
+      user-select: none;
+    }
+    @keyframes zoomIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
     }
 
     .address-grid {
@@ -148,10 +230,13 @@
   <main>
     <!-- 1. TAB: SHOP -->
     <div id="tab-shop" class="tab-content active">
+      
+      <!-- Banner แสดงรายละเอียดการสั่งสินค้า -->
       <div class="hero-banner">
-        <h2>สั่งของดีจากทั่วโลก</h2>
-        <p>พรีออเดอร์สินค้าคุณภาพ ส่งตรงถึงมือคุณ</p>
-        <button class="hero-btn" onclick="document.getElementById('products-section').scrollIntoView({behavior: 'smooth'})">เลือกซื้อสินค้า</button>
+        <h2>สินค้าพรีออเดอร์</h2>
+        <p>
+        ใช้ระยะเวลารอสินค้าหลังจากปิดพรีประมาณ 7-10 วัน นับตั้งแต่ออกจากโกดังในประเทศที่สั่งซื้อ และไม่รวมระยะเวลาการจัดส่งในไทย หรือเหตุการณ์ที่เกิดความล่าช้า เช่น สภาพอากาศรุนแรง ติดด่าน ซึ่งจะมีการอัพเดตสินค้าถึงไทยให้ลูกค้าทราบผ่านช่องทาง LINE
+        </p>
       </div>
 
       <h3 class="section-title" id="products-section">สินค้าพรีออเดอร์</h3>
@@ -278,6 +363,12 @@
     </div>
   </div>
 
+  <!-- Modal ซูมรูปภาพขนาดใหญ่ (Zoom Lightbox) -->
+  <div id="zoom-modal" class="zoom-modal" onclick="closeZoomModal()">
+    <span class="zoom-modal-close" onclick="closeZoomModal()">&times;</span>
+    <img id="zoom-modal-img" class="zoom-modal-content" src="" alt="ซูมรูปภาพ">
+  </div>
+
   <!-- Modal 2 & 3 -->
   <div id="line-confirm-modal" class="modal">
     <div class="modal-card text-center">
@@ -313,7 +404,42 @@
     let modalQty = 1;
     let selectedCategory = 'ALL';
 
-    // ฟังก์ชันสำหรับแปลงค่า p_type ให้แสดงผลเป็นภาษาไทย (รองรับ ready, preorder ทุกรูปแบบ)
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+
+    function renderTypeBadge(product) {
+      if (!product || !product.p_type) return '';
+      
+      const typeText = getTypeNameTH(product.p_type);
+      const cleanType = product.p_type.toString().trim().toLowerCase();
+      
+      // กรณีที่เป็นประเภทพรีออเดอร์ ให้ตรวจสอบวันที่เพื่อนำมาต่อท้าย
+      if (cleanType === 'preorder' || cleanType === 'pre_order' || cleanType === 'พรีออเดอร์') {
+        const start = formatDate(product.preorder_start);
+        const end = formatDate(product.preorder_end);
+        let dateRange = '';
+
+        if (start && end) {
+          dateRange = ` (${start} - ${end})`;
+        } else if (start) {
+          dateRange = ` (เริ่ม ${start})`;
+        } else if (end) {
+          dateRange = ` (ปิด ${end})`;
+        }
+
+        return `<span class="type-badge">${typeText}${dateRange}</span>`;
+      }
+
+      return `<span class="type-badge">${typeText}</span>`;
+    }
+
     function getTypeNameTH(type) {
       if (!type) return '';
       const cleanType = type.toString().trim().toLowerCase();
@@ -374,10 +500,7 @@
 
         productsData = pData || [];
         
-        // สร้าง Category Filter Bar
         renderCategoryBar();
-        
-        // แสดงสินค้า
         renderProducts(productsData);
 
       } catch (err) {
@@ -386,10 +509,8 @@
       }
     }
 
-    // ฟังก์ชันสร้างปุ่มตัวกรองประเภทสินค้า p_type (แปลง ready/preorder เป็นภาษาไทย)
     function renderCategoryBar() {
       const categoryBar = document.getElementById('category-bar');
-      // ดึง p_type ทั้งหมดที่เป็นค่าไม่ว่าง และลบค่าที่ซ้ำออก
       const types = [...new Set(productsData.map(p => p.p_type).filter(type => type && type.toString().trim() !== ''))];
       
       let html = `<button class="category-btn ${selectedCategory === 'ALL' ? 'active' : ''}" onclick="filterByCategory('ALL')">ทั้งหมด</button>`;
@@ -402,10 +523,9 @@
       categoryBar.innerHTML = html;
     }
 
-    // ฟังก์ชันกรองสินค้าตามประเภท
     function filterByCategory(category) {
       selectedCategory = category;
-      renderCategoryBar(); // อัปเดตสถานะปุ่ม active
+      renderCategoryBar();
       
       if (category === 'ALL') {
         filteredProducts = productsData;
@@ -416,7 +536,6 @@
       renderProducts(filteredProducts);
     }
 
-    // ฟังก์ชัน Render การ์ดสินค้าบนหน้าเว็บ
     function renderProducts(list) {
       const container = document.getElementById('products-list');
       
@@ -434,8 +553,7 @@
           ? `<span style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;">📸 ${p.image_url.length} รูป</span>` 
           : '';
 
-        // แสดง Badge p_type แปลง ready/preorder เป็นภาษาไทย
-        const typeBadge = p.p_type ? `<span class="type-badge">${getTypeNameTH(p.p_type)}</span>` : '';
+        const typeBadge = renderTypeBadge(p);
         const priceText = getPriceRangeText(p.p_code_a);
 
         return `
@@ -460,13 +578,8 @@
       document.getElementById('modal-qty-val').innerText = modalQty;
       document.getElementById('modal-p-title').innerText = selectedProduct.p_name;
 
-      // แสดง p_type ใน Modal แปลงเป็นภาษาไทย
       const typeBadgeBox = document.getElementById('modal-p-type-badge');
-      if (selectedProduct.p_type) {
-        typeBadgeBox.innerHTML = `<span class="type-badge">${getTypeNameTH(selectedProduct.p_type)}</span>`;
-      } else {
-        typeBadgeBox.innerHTML = '';
-      }
+      typeBadgeBox.innerHTML = renderTypeBadge(selectedProduct);
 
       let imagesList = [];
       if (Array.isArray(selectedProduct.image_url) && selectedProduct.image_url.length > 0) {
@@ -477,15 +590,19 @@
         imagesList = ['https://via.placeholder.com/300'];
       }
 
+      // ผูก Event ให้กดคลิกที่รูปเพื่อเปิด Modal ซูมรูป
       const sliderContainer = document.getElementById('modal-p-img-slider');
-      sliderContainer.innerHTML = imagesList.map(url => `<img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img">`).join('');
+      sliderContainer.innerHTML = imagesList.map(url => 
+        `<img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img" onclick="openZoomModal('${url}')" title="คลิกเพื่อซูมดูรูปใหญ่">`
+      ).join('');
 
       const badge = document.getElementById('modal-img-count-badge');
       if (imagesList.length > 1) {
-        badge.innerText = `1 / ${imagesList.length} (ปัดซ้าย-ขวาเพื่อดูรูป)`;
+        badge.innerText = `1 / ${imagesList.length} (ปัดซ้าย-ขวาเพื่อดูรูป / แตะเพื่อซูม)`;
         badge.style.display = 'block';
       } else {
-        badge.style.display = 'none';
+        badge.innerText = `แตะรูปเพื่อซูม`;
+        badge.style.display = 'block';
       }
 
       const variantSelect = document.getElementById('modal-p-variant');
@@ -503,6 +620,18 @@
 
       updateModalPrice();
       document.getElementById('product-modal').style.display = 'flex';
+    }
+
+    /* --- ฟังก์ชันสำหรับการซูมรูปภาพ --- */
+    function openZoomModal(imgUrl) {
+      const zoomModal = document.getElementById('zoom-modal');
+      const zoomImg = document.getElementById('zoom-modal-img');
+      zoomImg.src = imgUrl;
+      zoomModal.style.display = 'flex';
+    }
+
+    function closeZoomModal() {
+      document.getElementById('zoom-modal').style.display = 'none';
     }
 
     function updateModalPrice() {
@@ -532,6 +661,8 @@
           p_id: selectedProduct.p_id,
           p_name: selectedProduct.p_name,
           p_type: selectedProduct.p_type || '',
+          preorder_start: selectedProduct.preorder_start || null,
+          preorder_end: selectedProduct.preorder_end || null,
           p_price: price,
           t_code: tCode,
           t_name: tCode,
@@ -569,9 +700,7 @@
 
       summaryBox.style.display = 'flex';
       container.innerHTML = cart.map((item, idx) => {
-        const typeBadge = item.p_type 
-          ? `<span style="background-color:#e0e7ff; color:#4338ca; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:500; margin-left:6px;">${getTypeNameTH(item.p_type)}</span>` 
-          : '';
+        const typeBadge = renderTypeBadge(item);
 
         return `
           <div class="cart-item-row">
@@ -629,11 +758,15 @@
       document.getElementById('line-confirm-modal').style.display = 'flex';
     }
 
+    // ----------------------------------------------------
+    // ปรับแก้เพิ่ม p_type และ p_id ลงใน order_items
+    // ----------------------------------------------------
     async function processOrderInsertion() {
       closeModal('line-confirm-modal');
       const totalAmount = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
 
       try {
+        // 1. บันทึกคำสั่งซื้อหลักลง orders
         const { data: orderData, error: orderErr } = await supabase.from('orders').insert([{
           o_name: document.getElementById('cust-name').value,
           o_phone: document.getElementById('cust-phone').value,
@@ -649,11 +782,14 @@
 
         if (orderErr) throw orderErr;
 
+        // 2. บันทึกรายการสินค้าลง order_items (เพิ่ม p_type และ p_id)
         const itemsToInsert = cart.map(item => ({
           order_id: orderData.o_id,
-          p_code_a: item.t_code,
+          p_id: item.p_id,                 // ID ของสินค้า
+          p_code_a: item.t_code,           // รหัสตัวเลือกสินค้า (t_code)
           quantity: item.quantity,
-          price: item.p_price
+          price: item.p_price,
+          p_type: item.p_type || 'ready'   // บันทึกประเภทสินค้า (พรีออเดอร์ / พร้อมส่ง)
         }));
 
         const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
