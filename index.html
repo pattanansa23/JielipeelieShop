@@ -16,7 +16,7 @@
   <!-- นำเข้าไฟล์ CSS -->
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- สไตล์เพิ่มเติมสำหรับ Badge, Category Bar, Hero Banner และ Zoom Modal -->
+  <!-- สไตล์เพิ่มเติมสำหรับ Badge, Category Bar, Hero Banner และ Zoom Gallery Modal -->
   <style>
     /* Hero Banner Style */
     .hero-banner {
@@ -98,7 +98,7 @@
       margin-bottom: 6px;
     }
 
-    /* Image Slider ใน Modal */
+    /* Image Slider ใน Modal สินค้า */
     .modal-img-slider-container {
       position: relative;
       margin-bottom: 12px;
@@ -134,7 +134,7 @@
       object-fit: contain;
       border-radius: 12px;
       background-color: #f8fafc;
-      cursor: zoom-in; /* เปลี่ยนเคอร์เซอร์เป็นไอคอนซูม */
+      cursor: zoom-in;
       transition: opacity 0.2s ease;
     }
     .modal-slider-img:hover {
@@ -153,7 +153,7 @@
       pointer-events: none;
     }
 
-    /* --- Image Zoom Lightbox Modal --- */
+    /* --- Image Zoom Gallery Lightbox Modal --- */
     .zoom-modal {
       display: none;
       position: fixed;
@@ -162,35 +162,104 @@
       top: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.88);
+      background-color: rgba(0, 0, 0, 0.92);
       justify-content: center;
       align-items: center;
       backdrop-filter: blur(4px);
-      padding: 20px;
       box-sizing: border-box;
     }
-    .zoom-modal-content {
+
+    .zoom-modal-slider {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    .zoom-modal-slider::-webkit-scrollbar {
+      display: none;
+    }
+
+    .zoom-slide-item {
+      flex: 0 0 100%;
+      width: 100%;
+      height: 100%;
+      scroll-snap-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      box-sizing: border-box;
+    }
+
+    .zoom-slide-img {
       max-width: 95%;
-      max-height: 90vh;
+      max-height: 85vh;
       object-fit: contain;
       border-radius: 8px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      animation: zoomIn 0.2s ease;
     }
+
     .zoom-modal-close {
       position: absolute;
-      top: 20px;
-      right: 25px;
+      top: 15px;
+      right: 20px;
       color: #ffffff;
       font-size: 35px;
       font-weight: bold;
       cursor: pointer;
-      z-index: 10000;
+      z-index: 10001;
       user-select: none;
+      background: rgba(0,0,0,0.4);
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
     }
-    @keyframes zoomIn {
-      from { transform: scale(0.8); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+
+    /* ปุ่มเลื่อนภาพซ้าย-ขวา บนจอคอม */
+    .zoom-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+      font-size: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .zoom-nav-btn:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+    .zoom-nav-prev { left: 15px; }
+    .zoom-nav-next { right: 15px; }
+
+    .zoom-counter {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 10000;
+      pointer-events: none;
     }
 
     .address-grid {
@@ -202,6 +271,9 @@
     @media (max-width: 480px) {
       .address-grid {
         grid-template-columns: 1fr;
+      }
+      .zoom-nav-btn {
+        display: none; /* บนมือถือซ่อนปุ่มแล้วใช้นิ้วปัดเลื่อนเอาได้เลย */
       }
     }
   </style>
@@ -241,10 +313,9 @@
 
       <h3 class="section-title" id="products-section">สินค้าพรีออเดอร์</h3>
       
-      <!-- หมวดหมู่สินค้า / Category Bar (แสดง p_type ให้เลือกกรอง) -->
+      <!-- หมวดหมู่สินค้า / Category Bar -->
       <div id="category-bar" class="category-bar-container">
         <button class="category-btn active" onclick="filterByCategory('ALL')">ทั้งหมด</button>
-        <!-- ปุ่มประเภท p_type จะถูกดึงมาจาก Supabase และ Render ตรงนี้ -->
       </div>
 
       <div id="products-list" class="products-grid">กำลังโหลดรายการสินค้า...</div>
@@ -253,9 +324,7 @@
     <!-- 2. TAB: CART -->
     <div id="tab-cart" class="tab-content">
       <h3 class="section-title">ตะกร้าสินค้า</h3>
-      <div id="cart-items-container">
-        <!-- รายการสินค้าในตระกร้า -->
-      </div>
+      <div id="cart-items-container"></div>
       
       <div class="cart-summary" id="cart-summary-box" style="display: none;">
         <div class="total-price">รวม: <span id="cart-total-price">฿0</span></div>
@@ -332,7 +401,6 @@
     <div class="modal-card">
       <button class="modal-close" onclick="closeModal('product-modal')">&times;</button>
       
-      <!-- แสดง p_type ใน Modal -->
       <div id="modal-p-type-badge"></div>
       
       <h3 id="modal-p-title" class="section-title" style="margin-bottom:12px;">ชื่อสินค้า</h3>
@@ -363,10 +431,14 @@
     </div>
   </div>
 
-  <!-- Modal ซูมรูปภาพขนาดใหญ่ (Zoom Lightbox) -->
-  <div id="zoom-modal" class="zoom-modal" onclick="closeZoomModal()">
+  <!-- Modal ซูมรูปภาพขนาดใหญ่แบบ Gallery (เลื่อนดูรูปทั้งหมดได้) -->
+  <div id="zoom-modal" class="zoom-modal">
     <span class="zoom-modal-close" onclick="closeZoomModal()">&times;</span>
-    <img id="zoom-modal-img" class="zoom-modal-content" src="" alt="ซูมรูปภาพ">
+    <button class="zoom-nav-btn zoom-nav-prev" onclick="slideZoom(-1)">❮</button>
+    <button class="zoom-nav-btn zoom-nav-next" onclick="slideZoom(1)">❯</button>
+    
+    <div id="zoom-modal-slider" class="zoom-modal-slider" onscroll="onZoomScroll()"></div>
+    <div id="zoom-counter" class="zoom-counter">1 / 1</div>
   </div>
 
   <!-- Modal 2 & 3 -->
@@ -401,6 +473,7 @@
     let optionsMap = {}; 
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     let selectedProduct = null;
+    let currentProductImages = []; // เก็บรายการ URL รูปภาพของสินค้าปัจจุบัน
     let modalQty = 1;
     let selectedCategory = 'ALL';
 
@@ -420,7 +493,6 @@
       const typeText = getTypeNameTH(product.p_type);
       const cleanType = product.p_type.toString().trim().toLowerCase();
       
-      // กรณีที่เป็นประเภทพรีออเดอร์ ให้ตรวจสอบวันที่เพื่อนำมาต่อท้าย
       if (cleanType === 'preorder' || cleanType === 'pre_order' || cleanType === 'พรีออเดอร์') {
         const start = formatDate(product.preorder_start);
         const end = formatDate(product.preorder_end);
@@ -581,24 +653,23 @@
       const typeBadgeBox = document.getElementById('modal-p-type-badge');
       typeBadgeBox.innerHTML = renderTypeBadge(selectedProduct);
 
-      let imagesList = [];
       if (Array.isArray(selectedProduct.image_url) && selectedProduct.image_url.length > 0) {
-        imagesList = selectedProduct.image_url.map(url => formatDriveUrl(url));
+        currentProductImages = selectedProduct.image_url.map(url => formatDriveUrl(url));
       } else if (typeof selectedProduct.image_url === 'string' && selectedProduct.image_url) {
-        imagesList = [formatDriveUrl(selectedProduct.image_url)];
+        currentProductImages = [formatDriveUrl(selectedProduct.image_url)];
       } else {
-        imagesList = ['https://via.placeholder.com/300'];
+        currentProductImages = ['https://via.placeholder.com/300'];
       }
 
-      // ผูก Event ให้กดคลิกที่รูปเพื่อเปิด Modal ซูมรูป
+      // Render รูปภาพในสไลเดอร์หน้าป๊อปอัปสินค้า
       const sliderContainer = document.getElementById('modal-p-img-slider');
-      sliderContainer.innerHTML = imagesList.map(url => 
-        `<img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img" onclick="openZoomModal('${url}')" title="คลิกเพื่อซูมดูรูปใหญ่">`
+      sliderContainer.innerHTML = currentProductImages.map((url, index) => 
+        `<img src="${url}" alt="${selectedProduct.p_name}" class="modal-slider-img" onclick="openZoomModal(${index})" title="คลิกเพื่อซูมดูรูปใหญ่">`
       ).join('');
 
       const badge = document.getElementById('modal-img-count-badge');
-      if (imagesList.length > 1) {
-        badge.innerText = `1 / ${imagesList.length} (ปัดซ้าย-ขวาเพื่อดูรูป / แตะเพื่อซูม)`;
+      if (currentProductImages.length > 1) {
+        badge.innerText = `1 / ${currentProductImages.length} (ปัดซ้าย-ขวาเพื่อดูรูป / แตะเพื่อซูม)`;
         badge.style.display = 'block';
       } else {
         badge.innerText = `แตะรูปเพื่อซูม`;
@@ -622,16 +693,49 @@
       document.getElementById('product-modal').style.display = 'flex';
     }
 
-    /* --- ฟังก์ชันสำหรับการซูมรูปภาพ --- */
-    function openZoomModal(imgUrl) {
+    /* --- ฟังก์ชันสำหรับการซูมรูปภาพแบบ Gallery (เลื่อนดูรูปภาพที่เหลือได้) --- */
+    function openZoomModal(startIndex = 0) {
       const zoomModal = document.getElementById('zoom-modal');
-      const zoomImg = document.getElementById('zoom-modal-img');
-      zoomImg.src = imgUrl;
+      const slider = document.getElementById('zoom-modal-slider');
+      
+      // สร้าง HTML สำหรับรูปทุกรูปในอัลบั้ม
+      slider.innerHTML = currentProductImages.map(url => 
+        `<div class="zoom-slide-item">
+          <img src="${url}" class="zoom-slide-img" alt="ซูมรูปภาพ">
+        </div>`
+      ).join('');
+
       zoomModal.style.display = 'flex';
+
+      // เลื่อนไปยังรูปภาพที่ผู้ใช้เลือกคลิกเข้ามา
+      setTimeout(() => {
+        const slideWidth = slider.clientWidth;
+        slider.scrollLeft = startIndex * slideWidth;
+        updateZoomCounter(startIndex + 1);
+      }, 50);
     }
 
     function closeZoomModal() {
       document.getElementById('zoom-modal').style.display = 'none';
+    }
+
+    function slideZoom(direction) {
+      const slider = document.getElementById('zoom-modal-slider');
+      const slideWidth = slider.clientWidth;
+      slider.scrollBy({ left: direction * slideWidth, behavior: 'smooth' });
+    }
+
+    function onZoomScroll() {
+      const slider = document.getElementById('zoom-modal-slider');
+      const slideWidth = slider.clientWidth;
+      if (slideWidth === 0) return;
+      const currentIndex = Math.round(slider.scrollLeft / slideWidth) + 1;
+      updateZoomCounter(currentIndex);
+    }
+
+    function updateZoomCounter(current) {
+      const total = currentProductImages.length;
+      document.getElementById('zoom-counter').innerText = `${current} / ${total}`;
     }
 
     function updateModalPrice() {
@@ -758,15 +862,11 @@
       document.getElementById('line-confirm-modal').style.display = 'flex';
     }
 
-    // ----------------------------------------------------
-    // ปรับแก้เพิ่ม p_type และ p_id ลงใน order_items
-    // ----------------------------------------------------
     async function processOrderInsertion() {
       closeModal('line-confirm-modal');
       const totalAmount = cart.reduce((sum, item) => sum + (item.p_price * item.quantity), 0);
 
       try {
-        // 1. บันทึกคำสั่งซื้อหลักลง orders
         const { data: orderData, error: orderErr } = await supabase.from('orders').insert([{
           o_name: document.getElementById('cust-name').value,
           o_phone: document.getElementById('cust-phone').value,
@@ -782,14 +882,13 @@
 
         if (orderErr) throw orderErr;
 
-        // 2. บันทึกรายการสินค้าลง order_items (เพิ่ม p_type และ p_id)
         const itemsToInsert = cart.map(item => ({
           order_id: orderData.o_id,
-          p_id: item.p_id,                 // ID ของสินค้า
-          p_code_a: item.t_code,           // รหัสตัวเลือกสินค้า (t_code)
+          p_id: item.p_id,
+          p_code_a: item.t_code,
           quantity: item.quantity,
           price: item.p_price,
-          p_type: item.p_type || 'ready'   // บันทึกประเภทสินค้า (พรีออเดอร์ / พร้อมส่ง)
+          p_type: item.p_type || 'ready'
         }));
 
         const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
