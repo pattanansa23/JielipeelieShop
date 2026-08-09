@@ -48,6 +48,44 @@
       border-radius: 6px;
       margin-top: 10px;
     }
+
+    /* สไตล์สำหรับแท็กตัวเลือกสินค้าที่มีปุ่มแก้ไข/ลบ */
+    .item-tag-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .item-tag-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #e0e7ff;
+      color: #3730a3;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid #c7d2fe;
+    }
+    .item-tag-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 4px;
+    }
+    .btn-tag-action {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0 2px;
+      line-height: 1;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    .btn-tag-action:hover {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -87,7 +125,9 @@
 
       <div style="margin-top: 18px; padding-top: 15px; border-top: 1px solid #f3f4f6;">
         <div style="font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 8px;">ตัวเลือกที่มีในระบบปัจจุบัน:</div>
-        <div id="items-tag-list"><span style="color:#9ca3af; font-size:13px;">กำลังโหลด...</span></div>
+        <div id="items-tag-list" class="item-tag-container">
+          <span style="color:#9ca3af; font-size:13px;">กำลังโหลด...</span>
+        </div>
       </div>
     </div>
 
@@ -299,7 +339,11 @@
     }
 
     async function loadProductItems() {
-      const { data: items } = await supabase.from('products_item').select('*');
+      const { data: items, error } = await supabase.from('products_item').select('*');
+      if (error) {
+        console.error("Error loading items:", error);
+        return;
+      }
       globalItemsList = items || [];
 
       const tagList = document.getElementById('items-tag-list');
@@ -307,11 +351,58 @@
         tagList.innerHTML = '<span style="color:#9ca3af; font-size:13px;">ยังไม่มีตัวเลือกในระบบ</span>';
       } else {
         tagList.innerHTML = globalItemsList.map(item => `
-          <span class="tag-badge">${item.t_code} (฿${item.t_price ?? 0})</span>
+          <div class="item-tag-card">
+            <span><strong>${item.t_code}</strong> (฿${item.t_price ?? 0})</span>
+            <div class="item-tag-actions">
+              <button class="btn-tag-action" onclick="editProductItem('${item.t_code}', ${item.t_price ?? 0})" title="แก้ไขราคา">✏️</button>
+              <button class="btn-tag-action" onclick="deleteProductItem('${item.t_code}')" title="ลบตัวเลือก">🗑️</button>
+            </div>
+          </div>
         `).join('');
       }
 
       renderCheckboxes(globalItemsList, 'item-checkboxes');
+    }
+
+    // ฟังก์ชันแก้ไขราคาตัวเลือก
+    async function editProductItem(tCode, currentPrice) {
+      const newPriceStr = prompt(`แก้ไขราคาสำหรับตัวเลือก [ ${tCode} ]`, currentPrice);
+      if (newPriceStr === null) return; // กดยกเลิก
+      
+      const newPrice = parseFloat(newPriceStr);
+      if (isNaN(newPrice)) {
+        alert('กรุณากรอกตัวเลขราคาที่ถูกต้อง');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('products_item')
+        .update({ t_price: newPrice })
+        .eq('t_code', tCode);
+
+      if (error) {
+        alert('แก้ไขราคาไม่สำเร็จ: ' + error.message);
+      } else {
+        alert(`อัปเดตราคา [ ${tCode} ] เป็น ฿${newPrice} เรียบร้อย`);
+        loadProductItems();
+      }
+    }
+
+    // ฟังก์ชันลบตัวเลือก
+    async function deleteProductItem(tCode) {
+      if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบตัวเลือก [ ${tCode} ] ออกจากระบบ?`)) return;
+
+      const { error } = await supabase
+        .from('products_item')
+        .delete()
+        .eq('t_code', tCode);
+
+      if (error) {
+        alert('ลบตัวเลือกไม่สำเร็จ: ' + error.message);
+      } else {
+        alert(`ลบตัวเลือก [ ${tCode} ] เรียบร้อย`);
+        loadProductItems();
+      }
     }
 
     async function loadProductsList() {
